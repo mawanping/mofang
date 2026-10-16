@@ -20,6 +20,58 @@
   --font-mono: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
+/* 工作台三配色：green（默认浅绿）/ white（纯白）/ dark（黑色）
+   通过 html[data-wb] 覆盖 --color-mf-* 变量实现全局换肤 */
+:root {
+  --mf-active: #FAF9F5;
+  --mf-sel: #DCE8E0;
+  --mf-scroll: #D3D1C7;
+  --mf-scroll-hover: #B4B2A9;
+  --mf-gutter: #C9C6BD;
+}
+
+html[data-wb="white"] {
+  --color-mf-canvas: #FFFFFF;
+  --color-mf-app: #FFFFFF;
+  --color-mf-side: #FFFFFF;
+  --color-mf-card: #FFFFFF;
+  --color-mf-primary: #2F6B4F;
+  --color-mf-primary-soft: #E4EEE8;
+  --color-mf-ink: #1A1A18;
+  --color-mf-ink-2: #3D3B36;
+  --color-mf-ink-3: #7C786E;
+  --color-mf-ink-4: #968F80;
+  --color-mf-line: #ECECE6;
+  --color-mf-line-2: #D8D8D0;
+  --mf-active: #F6F6F2;
+  --mf-sel: #E4EEE8;
+  --mf-scroll: #D8D8D0;
+  --mf-scroll-hover: #B8B8B0;
+  --mf-gutter: #C4C4BA;
+}
+
+html[data-wb="dark"] {
+  --color-mf-canvas: #161613;
+  --color-mf-app: #1D1D19;
+  --color-mf-side: #21211C;
+  --color-mf-card: #23231E;
+  --color-mf-primary: #6FB58F;
+  --color-mf-primary-soft: #2C3B32;
+  --color-mf-wood: #C9A875;
+  --color-mf-wood-soft: #C9A875;
+  --color-mf-ink: #ECEAE2;
+  --color-mf-ink-2: #C9C6BB;
+  --color-mf-ink-3: #948F81;
+  --color-mf-ink-4: #7A7568;
+  --color-mf-line: #34342C;
+  --color-mf-line-2: #45453A;
+  --mf-active: #2A2A24;
+  --mf-sel: #34433A;
+  --mf-scroll: #3A3A32;
+  --mf-scroll-hover: #4A4A40;
+  --mf-gutter: #55554A;
+}
+
 * { box-sizing: border-box; }
 
 html, body, #app {
@@ -38,8 +90,8 @@ body {
 }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: #D3D1C7; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #B4B2A9; }
+::-webkit-scrollbar-thumb { background: var(--mf-scroll); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--mf-scroll-hover); }
 ::-webkit-scrollbar-track { background: transparent; }
 
 .mf-scroll { overflow-y: auto; overscroll-behavior: contain; }
@@ -56,12 +108,15 @@ body {
 .cm-editor .cm-gutters {
   background: var(--color-mf-card);
   border-right: 0.5px solid var(--color-mf-line);
-  color: #C9C6BD;
+  color: var(--mf-gutter);
 }
-.cm-editor .cm-activeLine { background: #FAF9F5; }
-.cm-editor .cm-activeLineGutter { background: #FAF9F5; color: var(--color-mf-ink-3); }
-.cm-editor .cm-selectionBackground { background: #DCE8E0 !important; }
+.cm-editor .cm-activeLine { background: var(--mf-active); }
+.cm-editor .cm-activeLineGutter { background: var(--mf-active); color: var(--color-mf-ink-3); }
+.cm-editor .cm-selectionBackground { background: var(--mf-sel) !important; }
 .cm-editor .cm-cursor { border-left-color: var(--color-mf-primary); }
+/* 深色工作台下 CodeMirror 代码高亮反色 */
+html[data-wb="dark"] .cm-editor { color: #D8D5CC; }
+html[data-wb="dark"] .cm-editor .cm-content { caret-color: #6FB58F; }
 
 /* KaTeX 样式 */
 @import "katex/dist/katex.min.css";

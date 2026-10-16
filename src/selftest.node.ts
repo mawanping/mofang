@@ -36,6 +36,9 @@ const res = renderMarkdown(SAMPLE, DEFAULT_RULES)
 const resDel = renderMarkdown('~~删除线~~ 与 ~波浪线~', DEFAULT_RULES)
 const resTipBody = renderMarkdown(':::tip 小提示\n**加粗** 与 `代码`。\n:::', DEFAULT_RULES)
 const resDollar = renderMarkdown('价格 $5 和 $10 而已', DEFAULT_RULES)
+// 深色横幅 + 行内 span 样式（marked 行内 HTML 经 DOMPurify 保留 style）
+const resBanner = renderMarkdown(':::banner 重点\n**金句**正文。\n:::', DEFAULT_RULES)
+const resSpan = renderMarkdown('这是 <span style="color:#C0392B;font-size:18px">红色大字</span> 结尾', DEFAULT_RULES)
 
 const checks: [string, boolean, string][] = [
   ['渲染体积合理', res.html.length > 500 && res.html.length < 30000, `${res.html.length}`],
@@ -54,6 +57,9 @@ const checks: [string, boolean, string][] = [
   ['波浪线不抢删除线', resDel.html.includes('markup-wavyline'), ''],
   ['提示框内markdown', resTipBody.html.includes('<strong>加粗</strong>') && resTipBody.html.includes('<code>代码</code>'), ''],
   ['金额$不误伤', !resDollar.html.includes('katex') && resDollar.html.includes('$5'), ''],
+  ['深色横幅banner', resBanner.html.includes('mf-custom-banner') && resBanner.html.includes('border-top:4px solid'), ''],
+  ['横幅内markdown', resBanner.html.includes('<strong>金句</strong>'), ''],
+  ['行内span样式', resSpan.html.includes('<span style="color:#C0392B;font-size:18px">红色大字</span>'), resSpan.html.match(/<span style="[^"]*">[^<]*<\/span>/)?.[0] ?? 'none'],
 ]
 
 const fails = checks.filter((c) => !c[1])

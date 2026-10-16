@@ -70,7 +70,33 @@ function insert(text: string, cursorOffset = 0) {
   emit('update:modelValue', v.state.doc.toString())
 }
 
-defineExpose({ insert })
+/** 取当前选中文本（行内样式包裹用） */
+function getSelected(): string {
+  const v = view.value
+  if (!v) return ''
+  const { from, to } = v.state.selection.main
+  return v.state.sliceDoc(from, to)
+}
+
+/** 插入文本并把其中的占位符选中，方便直接打字覆盖 */
+function insertAndSelect(text: string, selectText?: string) {
+  const v = view.value
+  if (!v) return
+  const sel = v.state.selection.main
+  v.dispatch({ changes: { from: sel.from, to: sel.to, insert: text } })
+  if (selectText) {
+    const idx = text.indexOf(selectText)
+    if (idx >= 0) {
+      v.dispatch({
+        selection: { anchor: sel.from + idx, head: sel.from + idx + selectText.length },
+      })
+    }
+  }
+  v.focus()
+  emit('update:modelValue', v.state.doc.toString())
+}
+
+defineExpose({ insert, getSelected, insertAndSelect })
 </script>
 
 <template>

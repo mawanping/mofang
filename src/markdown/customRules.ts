@@ -6,7 +6,7 @@
 export interface CustomRule {
   id: string
   symbol: string
-  component: 'quote' | 'tip' | 'card' | 'highlight' | 'html'
+  component: 'quote' | 'tip' | 'card' | 'banner' | 'highlight' | 'html'
   color?: string
   borderWidth?: number
   background?: string
@@ -33,6 +33,9 @@ function buildTemplate(rule: CustomRule, inner: string): string {
       return `<section class="mf-custom mf-custom-tip" style="background:${bg};border:0.5px solid ${color};border-radius:8px;padding:12px 16px;margin:16px 0;"><p class="mf-custom-label" style="color:${color};font-size:12px;font-weight:500;letter-spacing:1px;margin:0 0 6px;">${rule.label || '提示'}</p><div class="mf-custom-body">${inner}</div></section>`
     case 'card':
       return `<section class="mf-custom mf-custom-card" style="background:${bg};border-radius:10px;padding:18px 20px;margin:18px 0;"><div class="mf-custom-body">${inner}</div></section>`
+    case 'banner':
+      // 深色横幅：暗底 + 顶部一条主色线，正文反白，适合金句/章节分隔
+      return `<section class="mf-custom mf-custom-banner" style="background:#221F1B;border-top:4px solid ${color};border-radius:10px;padding:16px 18px;margin:18px 0;"><p class="mf-custom-label" style="color:${color};font-size:12px;font-weight:600;letter-spacing:1.5px;margin:0 0 6px;">${rule.label || 'BANNER'}</p><div class="mf-custom-body" style="color:#F2EFE8;">${inner}</div></section>`
     case 'highlight':
       return `<span class="mf-custom mf-custom-highlight" style="background:${bg};color:${color};padding:1px 5px;border-radius:3px;font-weight:500;">${inner}</span>`
     case 'html':
@@ -129,6 +132,13 @@ export const DEFAULT_RULES: CustomRule[] = [
     id: 'r-card',
     symbol: ':::card',
     component: 'card',
+    enabled: true,
+  },
+  {
+    id: 'r-banner',
+    symbol: ':::banner',
+    component: 'banner',
+    label: '重点',
     enabled: true,
   },
 ]

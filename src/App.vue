@@ -42,6 +42,23 @@ onMounted(async () => {
         <span class="text-[8.5px] leading-none">{{ n.label }}</span>
       </button>
       <div class="flex-1"></div>
+      <!-- 工作台配色切换 -->
+      <div class="flex flex-col items-center gap-1 mb-1">
+        <button
+          v-for="t in ([
+            { k: 'green', label: '浅绿', dot: '#ECEAE3', ring: '#2F6B4F' },
+            { k: 'white', label: '纯白', dot: '#FFFFFF', ring: '#C8C8C0' },
+            { k: 'dark', label: '黑色', dot: '#161613', ring: '#4A4A40' },
+          ] as const)"
+          :key="t.k"
+          class="w-7 h-7 rounded-md flex items-center justify-center transition-colors"
+          :class="store.wbTheme === t.k ? 'bg-mf-primary-soft text-mf-primary' : 'text-mf-ink-4 hover:bg-black/[0.05]'"
+          :title="`工作台配色：${t.label}`"
+          @click="store.setWbTheme(t.k)"
+        >
+          <span class="w-3.5 h-3.5 rounded-full border" :style="{ background: t.dot, borderColor: store.wbTheme === t.k ? t.ring : 'transparent' }"></span>
+        </button>
+      </div>
       <a
         href="https://github.com/doocs/md"
         target="_blank"

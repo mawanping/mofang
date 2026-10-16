@@ -15,6 +15,9 @@ import { DEFAULT_RULES, type CustomRule } from '../markdown/customRules'
 
 export type EditorMode = 'markdown' | 'template'
 
+/** 工作台配色 */
+export type WbTheme = 'green' | 'white' | 'dark'
+
 export const useEditorStore = defineStore('editor', () => {
   /* ---------- 文档 ---------- */
   const docs = ref<DocRecord[]>([])
@@ -48,9 +51,23 @@ export const useEditorStore = defineStore('editor', () => {
   const aiModel = ref('')
   const aiPresets = ref<unknown[]>([])
 
+  /* ---------- 工作台配色：green 浅绿 / white 纯白 / dark 黑色 ---------- */
+  const wbTheme = ref<WbTheme>((localStorage.getItem('mf-wb') as WbTheme) || 'green')
+
+  function applyWb(): void {
+    document.documentElement.dataset.wb = wbTheme.value
+  }
+
+  function setWbTheme(t: WbTheme): void {
+    wbTheme.value = t
+    localStorage.setItem('mf-wb', t)
+    applyWb()
+  }
+
   let saveTimer: number | undefined
 
   async function loadAll(): Promise<void> {
+    applyWb()
     const [allDocs, rules, s] = await Promise.all([
       listDocs(),
       getSetting<CustomRule[]>('customRules', DEFAULT_RULES),
@@ -167,6 +184,7 @@ export const useEditorStore = defineStore('editor', () => {
     saveState, lastSavedAt, wordCount, readMinutes,
     view, editorMode, previewMode, focusMode, leftPanel, aiPanelOpen, settingsOpen,
     customRules, aiProvider, aiApiKey, aiModel, aiPresets,
+    wbTheme, setWbTheme,
     loadAll, openDoc, newDoc, markDirty, flushSave, removeDoc, saveRules, saveAiConfig,
   }
 })

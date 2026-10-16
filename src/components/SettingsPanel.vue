@@ -92,12 +92,13 @@ async function chooseDir() {
         <div v-for="r in rules" :key="r.id" class="rounded-md border border-mf-line p-2.5 space-y-2">
           <div class="flex items-center gap-2">
             <input v-model="r.symbol" class="w-24 px-2 py-1 rounded border border-mf-line text-[12px] font-mono outline-none focus:border-mf-primary" placeholder=":::note" />
-            <select v-model="r.component" class="flex-1 px-2 py-1 rounded border border-mf-line bg-white text-[11.5px] outline-none">
-              <option value="quote">彩色引用卡</option>
-              <option value="tip">提示条</option>
-              <option value="card">主题卡</option>
-              <option value="highlight">行内高亮</option>
-            </select>
+          <select v-model="r.component" class="flex-1 px-2 py-1 rounded border border-mf-line bg-white text-[11.5px] outline-none">
+            <option value="quote">彩色引用卡</option>
+            <option value="tip">提示条</option>
+            <option value="card">主题卡</option>
+            <option value="banner">深色横幅（暗底+彩条）</option>
+            <option value="highlight">行内高亮</option>
+          </select>
             <label class="flex items-center gap-1 text-[11px] text-mf-ink-3 cursor-pointer">
               <input v-model="r.enabled" type="checkbox" class="accent-mf-primary" />
               启用
@@ -162,7 +163,8 @@ async function chooseDir() {
           <p><b class="text-mf-ink-2">快捷键</b></p>
           <p>Ctrl+S 保存 · Ctrl+Shift+F 专注模式 · Ctrl+P 导出 PDF</p>
           <p><b class="text-mf-ink-2">内置语法</b></p>
-          <p class="font-mono text-[11px] leading-relaxed">==高亮== ++下划线++ ~波浪~ x^2^<br />&gt; [!NOTE] 提示框 · :::tip 容器<br />$公式$ · [TOC] · [^脚注] · :emoji:</p>
+          <p class="font-mono text-[11px] leading-relaxed">==高亮== ++下划线++ ~波浪~ x^2^<br />&gt; [!NOTE] 提示框 · :::tip 容器 · :::banner 深色横幅<br />$公式$ · [TOC] · [^脚注] · :emoji:<br />&lt;span style="color:red"&gt;行内样式&lt;/span&gt;</p>
+          <p class="text-[11.5px] text-mf-ink-3 leading-relaxed">编辑器上方「格式 ▾」可一键插入上述格式；行内样式支持选中文字后直接上色/改字号/加底色。</p>
         </div>
       </div>
     </div>
