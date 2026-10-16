@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme {
+  --color-mf-canvas: #ECEAE3;
+  --color-mf-app: #F7F6F3;
+  --color-mf-side: #FBF9F4;
+  --color-mf-card: #FFFFFF;
+  --color-mf-primary: #2F6B4F;
+  --color-mf-primary-soft: #E4EEE8;
+  --color-mf-wood: #B89968;
+  --color-mf-wood-soft: #C9A875;
+  --color-mf-ink: #1F1E1B;
+  --color-mf-ink-2: #44423C;
+  --color-mf-ink-3: #8A867C;
+  --color-mf-ink-4: #9B978C;
+  --color-mf-line: #EAE7DF;
+  --color-mf-line-2: #D8D3C6;
+  --font-sans: -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --font-serif: Optima, "Songti SC", "Noto Serif SC", Georgia, "Times New Roman", serif;
+  --font-mono: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-mf-canvas);
+  color: var(--color-mf-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #D3D1C7; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #B4B2A9; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.mf-scroll { overflow-y: auto; overscroll-behavior: contain; }
+
+/* CodeMirror 主题覆写 */
+.cm-editor {
+  height: 100%;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  background: var(--color-mf-card);
+}
+.cm-editor .cm-scroller { line-height: 1.85; padding: 12px 0; }
+.cm-editor.cm-focused { outline: none; }
+.cm-editor .cm-gutters {
+  background: var(--color-mf-card);
+  border-right: 0.5px solid var(--color-mf-line);
+  color: #C9C6BD;
+}
+.cm-editor .cm-activeLine { background: #FAF9F5; }
+.cm-editor .cm-activeLineGutter { background: #FAF9F5; color: var(--color-mf-ink-3); }
+.cm-editor .cm-selectionBackground { background: #DCE8E0 !important; }
+.cm-editor .cm-cursor { border-left-color: var(--color-mf-primary); }
+
+/* KaTeX 样式 */
+@import "katex/dist/katex.min.css";
+
+@keyframes mf-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.mf-fade { animation: mf-fade-in .18s ease-out; }
+
+@keyframes mf-slide { from { transform: translateX(100%); } to { transform: none; } }
+.mf-slide { animation: mf-slide .22s cubic-bezier(.22,.61,.36,1); }
