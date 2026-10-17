@@ -3,6 +3,8 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import DOMPurify from 'dompurify'
 import { renderMarkdown } from '../markdown/render'
 import { inlineForWechat } from '../markdown/wechat'
+import { hydrateMermaid } from '../markdown/extensions/mermaid'
+import { hydratePlantuml } from '../markdown/extensions/plantuml'
 import type { CustomRule } from '../markdown/customRules'
 import { getTheme, composeThemeCSS } from '../themes'
 import { listAssets, type AssetRecord } from '../stores/db'
@@ -11,32 +13,35 @@ const props = defineProps<{
   content: string
   themeId: string
   primaryColor: string
-  mode: 'edit' | 'wechat'
   customRules: CustomRule[]
+  /** 同步滚动开关（由 WriteView 持有，编辑器侧联动用） */
+  syncScroll: boolean
+  /** 统计信息（状态栏同源） */
+  words: number
+  minutes: number
+  lastSavedAt: number
 }>()
 
-const emit = defineEmits<{ (e: 'copy'): void; (e: 'update:mode', m: 'edit' | 'wechat'): void }>()
-
 const output = ref<HTMLDivElement>()
-const rawHtml = ref('')
 const wechatHtml = ref('')
 const assets = ref<Map<string, AssetRecord>>(new Map())
 const themeStyleEl = ref<HTMLStyleElement>()
 
-/** 编辑视图=带 class 的预览版；微信视图=行内样式版（粘贴到公众号的真实效果） */
-const html = computed(() => (props.mode === 'wechat' ? wechatHtml.value : rawHtml.value))
+/** 桌面端预览：390px 手机宽 ↔ 全宽桌面，持久化 */
+const desktopPreview = ref(localStorage.getItem('mf-desktop-preview') === '1')
+watch(desktopPreview, (v) => localStorage.setItem('mf-desktop-preview', v ? '1' : '0'))
+
+const clean = computed(() =>
+  DOMPurify.sanitize(wechatHtml.value, {
+    ADD_TAGS: ['mark', 'u', 'sup', 'section', 'nav', 'ruby', 'rt', 'rp', 'img', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'pre', 'code', 'ol', 'ul', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'blockquote', 'a', 'strong', 'em', 'del', 'hr', 'br', 'span', 'div', 'figure', 'figcaption'],
+    ADD_ATTR: ['id', 'class', 'style', 'href', 'src', 'alt', 'target', 'rel', 'colspan', 'rowspan'],
+  }),
+)
 
 async function loadAssets() {
   const list = await listAssets()
   assets.value = new Map(list.map((a) => [a.id, a]))
 }
-
-const clean = computed(() =>
-  DOMPurify.sanitize(html.value, {
-    ADD_TAGS: ['mark', 'u', 'sup', 'section', 'nav', 'ruby', 'rt', 'rp'],
-    ADD_ATTR: ['id', 'class', 'style', 'href', 'src', 'target', 'rel', 'colspan', 'rowspan'],
-  }),
-)
 
 async function build() {
   const { html: raw } = renderMarkdown(props.content, props.customRules)
@@ -50,9 +55,8 @@ async function build() {
       return `<img src="${url}" alt="${alt}" />`
     })
   }
-  rawHtml.value = expanded
 
-  // 注入主题 CSS（编辑视图依赖它；微信视图自带行内样式）
+  // 注入主题 CSS：内联化在离屏 stage 上进行，head 里的主题样式对其生效
   const css = composeThemeCSS(props.themeId, props.primaryColor)
   if (!themeStyleEl.value) {
     themeStyleEl.value = document.createElement('style')
@@ -61,21 +65,21 @@ async function build() {
   }
   themeStyleEl.value.textContent = css
 
-  // 微信视图：离屏渲染 class 版再行内化。
-  // 不能直接读当前 #output——微信视图下它显示的就是内联版本身，会拿到空 DOM。
-  if (props.mode === 'wechat') {
-    const stage = document.createElement('div')
-    stage.style.position = 'fixed'
-    stage.style.left = '-99999px'
-    stage.style.top = '0'
-    stage.style.width = '390px'
-    stage.innerHTML = expanded
-    document.body.appendChild(stage)
-    try {
-      wechatHtml.value = inlineForWechat(stage)
-    } finally {
-      stage.remove()
-    }
+  // 离屏渲染 class 版 → 预渲染图表（mermaid svg / plantuml 图定态）→ 行内化，
+  // 得到与粘贴到公众号完全一致的 HTML
+  const stage = document.createElement('div')
+  stage.style.position = 'fixed'
+  stage.style.left = '-99999px'
+  stage.style.top = '0'
+  stage.style.width = '390px'
+  stage.innerHTML = expanded
+  document.body.appendChild(stage)
+  try {
+    await hydrateMermaid(stage)
+    await hydratePlantuml(stage)
+    wechatHtml.value = inlineForWechat(stage)
+  } finally {
+    stage.remove()
   }
 }
 
@@ -89,16 +93,6 @@ watch(
   { deep: true },
 )
 
-/* 切到微信视图时若内联版还没算（或已过期），立即补算 */
-watch(
-  () => props.mode,
-  async (m) => {
-    if (m !== 'wechat') return
-    if (debounce) window.clearTimeout(debounce)
-    await build()
-  },
-)
-
 onMounted(async () => {
   await loadAssets()
   await build()
@@ -110,28 +104,52 @@ defineExpose({ build, output })
 
 <template>
   <div class="h-full flex flex-col">
+    <!-- 头行：单一「公众号预览」 -->
     <div class="flex items-center justify-between px-3 h-9 border-b border-mf-line shrink-0">
-      <div class="flex items-center gap-1 text-[11px]">
-        <button
-          class="px-2 py-0.5 rounded transition-colors"
-          :class="mode === 'edit' ? 'bg-mf-primary-soft text-mf-primary font-medium' : 'text-mf-ink-3 hover:text-mf-ink'"
-          @click="emit('update:mode', 'edit')"
-        >
-          编辑视图
-        </button>
-        <span class="text-mf-ink-4">/</span>
-        <button
-          class="px-2 py-0.5 rounded transition-colors"
-          :class="mode === 'wechat' ? 'bg-mf-primary-soft text-mf-primary font-medium' : 'text-mf-ink-3 hover:text-mf-ink'"
-          @click="emit('update:mode', 'wechat')"
-        >
-          微信视图
-        </button>
+      <div class="flex items-center gap-1.5 text-[11px] font-medium text-mf-primary">
+        <span class="w-1.5 h-1.5 rounded-full bg-mf-primary"></span>
+        公众号预览
       </div>
-      <span class="text-[10px] text-mf-ink-4">{{ mode === 'wechat' ? '内联样式版 · 即粘贴后的真实效果' : '390px · 公众号阅读宽度' }}</span>
+      <span class="text-[10px] text-mf-ink-4">内联样式版 · 即粘贴后的真实效果</span>
     </div>
+
+    <!-- 预览主体：默认 390px 手机宽，桌面预览时全宽 -->
     <div ref="output" class="mf-scroll flex-1 bg-white">
-      <div id="output" class="mx-auto" style="max-width: 390px" v-html="clean"></div>
+      <div
+        id="output"
+        :class="desktopPreview ? '' : 'mx-auto'"
+        :style="desktopPreview ? '' : 'max-width: 390px'"
+        v-html="clean"
+      ></div>
+    </div>
+
+    <!-- 底部信息行：预览开关 + 统计 -->
+    <div class="h-7 px-3 flex items-center gap-3 border-t border-mf-line bg-mf-side shrink-0 text-[10.5px] text-mf-ink-3 select-none">
+      <button
+        class="flex items-center gap-1 hover:text-mf-primary transition-colors"
+        :class="desktopPreview ? 'text-mf-primary' : ''"
+        :title="desktopPreview ? '切换为手机宽度预览' : '切换为桌面全宽预览'"
+        @click="desktopPreview = !desktopPreview"
+      >
+        <span class="w-6 h-3 rounded-full relative transition-colors" :class="desktopPreview ? 'bg-mf-primary' : 'bg-black/15'">
+          <span class="absolute top-0.5 w-2 h-2 rounded-full bg-white transition-all" :class="desktopPreview ? 'left-3.5' : 'left-0.5'"></span>
+        </span>
+        桌面端预览
+      </button>
+      <button
+        class="flex items-center gap-1 hover:text-mf-primary transition-colors"
+        :class="syncScroll ? 'text-mf-primary' : ''"
+        :title="syncScroll ? '关闭编辑区与预览区同步滚动' : '开启编辑区与预览区同步滚动'"
+        @click="$emit('update:syncScroll', !syncScroll)"
+      >
+        <span class="w-6 h-3 rounded-full relative transition-colors" :class="syncScroll ? 'bg-mf-primary' : 'bg-black/15'">
+          <span class="absolute top-0.5 w-2 h-2 rounded-full bg-white transition-all" :class="syncScroll ? 'left-3.5' : 'left-0.5'"></span>
+        </span>
+        同步滚动
+      </button>
+      <div class="flex-1"></div>
+      <span v-if="lastSavedAt">上次修改 {{ new Date(lastSavedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) }}</span>
+      <span>{{ words }} 字 · 约 {{ minutes }} 分钟</span>
     </div>
   </div>
 </template>

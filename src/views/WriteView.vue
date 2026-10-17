@@ -27,6 +27,33 @@ function toggleToolbar() {
   localStorage.setItem('mf-toolbar-open', toolbarOpen.value ? '1' : '0')
 }
 
+/* ---------- 同步滚动（编辑器 ↔ 公众号预览，双向带锁） ---------- */
+const syncScroll = ref(localStorage.getItem('mf-sync-scroll') !== '0')
+watch(syncScroll, (v) => localStorage.setItem('mf-sync-scroll', v ? '1' : '0'))
+
+let scrollSyncing = false
+function bindSyncScroll() {
+  const ed = editorRef.value?.scrollEl?.()
+  const pv = previewRef.value?.output
+  if (!ed || !pv) return
+  const ratioOf = (el: HTMLElement) => el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight)
+  const applyRatio = (from: HTMLElement, to: HTMLElement) => {
+    to.scrollTop = ratioOf(from) * Math.max(0, to.scrollHeight - to.clientHeight)
+  }
+  ed.addEventListener('scroll', () => {
+    if (!syncScroll.value || scrollSyncing) return
+    scrollSyncing = true
+    applyRatio(ed, pv)
+    requestAnimationFrame(() => (scrollSyncing = false))
+  })
+  pv.addEventListener('scroll', () => {
+    if (!syncScroll.value || scrollSyncing) return
+    scrollSyncing = true
+    applyRatio(pv, ed)
+    requestAnimationFrame(() => (scrollSyncing = false))
+  })
+}
+
 /* ---------- 左栏独立配色（CSS 变量作用域映射，子组件零改动） ---------- */
 const panelTinted = computed(() => store.panelTheme !== 'ink' || !!store.panelCustom)
 const panelVars = computed(() => {
@@ -39,10 +66,6 @@ const panelVars = computed(() => {
     '--pn-line': c.soft,
   }
 })
-
-/* 左上角折叠图标（panel-left：矩形 + 左侧竖线） */
-const collapseIcon =
-  '<svg viewBox="0 0 16 16" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="3" width="12" height="10" rx="1.8"/><line x1="6.2" y1="3" x2="6.2" y2="13"/></svg>'
 
 function startResize(side: 'left' | 'right') {
   const e = window.event
@@ -110,6 +133,7 @@ watch(
 onMounted(async () => {
   await store.loadAll()
   if (!store.currentId) await store.newDoc('doc')
+  bindSyncScroll()
   /* AI 配图等外部入口的光标插入桥接 */
   ;(window as unknown as { __mfEditor?: { insert: (t: string) => void } }).__mfEditor = {
     insert: (t: string) => editorRef.value?.insert(t),
@@ -134,7 +158,6 @@ function onKey(e: KeyboardEvent) {
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
     e.preventDefault()
-    store.previewMode = 'wechat'
     setTimeout(() => window.print(), 200)
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
@@ -158,13 +181,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         :class="panelTinted ? 'mf-panel-tint--on' : ''"
         :style="[panelTinted ? panelVars : {}, { width: leftWidth + 'px' }]"
       >
-        <div class="flex items-center border-b border-mf-line shrink-0 pr-1">
-          <button
-            class="w-7 h-7 shrink-0 flex items-center justify-center text-mf-ink-3 hover:bg-black/[0.05] hover:text-mf-primary transition-colors"
-            title="收起左栏"
-            v-html="collapseIcon"
-            @click="store.toggleLeftPanel"
-          ></button>
+        <div class="flex items-center border-b border-mf-line shrink-0">
           <button
             class="flex-1 py-1.5 text-[11px]"
             :class="panelTab === 'docs' ? 'text-mf-primary font-medium border-b-2 border-mf-primary' : 'text-mf-ink-3'"
@@ -220,10 +237,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             :content="store.content"
             :theme-id="store.themeId"
             :primary-color="store.primaryColor"
-            :mode="store.previewMode"
             :custom-rules="store.customRules"
-            @copy="store.previewMode = 'wechat'"
-            @update:mode="store.previewMode = $event"
+            :sync-scroll="syncScroll"
+            :words="store.wordCount"
+            :minutes="store.readMinutes"
+            :last-saved-at="store.lastSavedAt"
+            @update:sync-scroll="syncScroll = $event"
           />
         </section>
       </template>

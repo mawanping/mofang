@@ -26,6 +26,33 @@ const SAMPLE = `# 奖赏系统如何劫载你的动力
 [TOC]
 `
 
+/* 扩展规则样例：LaTeX 标准格式 / 幻灯片 / Ruby 注音 / Mermaid / PlantUML */
+const SAMPLE2 = `## 进阶规则自检
+
+LaTeX 行内 \\(x^2 + y^2 = z^2\\) 与块级：
+
+\\[
+\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}
+\\]
+
+Ruby 注音：[你好]{nǐ hǎo} 与 [世界]^(shì jiè)。
+
+横屏幻灯片：
+
+<![图一](https://example.com/1.png),![图二](https://example.com/2.png)>
+
+\`\`\`mermaid
+graph LR
+  A[开始] --> B[结束]
+\`\`\`
+
+\`\`\`plantuml
+@startuml
+Alice -> Bob: 你好
+@enduml
+\`\`\`
+`
+
 const log: string[] = []
 function ok(name: string, cond: boolean, extra = '') {
   log.push(`${cond ? 'PASS' : 'FAIL'} | ${name}${extra ? ' | ' + extra : ''}`)
@@ -49,6 +76,18 @@ ok('公式 $', res.html.includes('katex'))
 }
 ok('调试-公式片段', true, (res.html.match(/.{0,60}公式.{0,120}/) || ['NONE'])[0].replace(/\n/g, ' '))
 ok('调试-tip片段', true, (res.html.match(/.{0,40}小提示.{0,160}/) || ['NONE'])[0].replace(/\n/g, ' '))
+
+/* ---------- 扩展规则自检（SAMPLE2） ---------- */
+const res2 = renderMarkdown(SAMPLE2, DEFAULT_RULES)
+ok('LaTeX 行内 \\(...\\) 渲染 katex', res2.html.includes('katex') && /\\\(/.test(SAMPLE2) && !res2.html.includes('\\(x'))
+ok('LaTeX 块级 \\[...\\] 渲染 katex', (res2.html.match(/katex-display/g) || []).length >= 1, `display 块数: ${(res2.html.match(/katex-display/g) || []).length}`)
+ok('Ruby 花括号注音', res2.html.includes('<ruby') && res2.html.includes('<rt>nǐ hǎo</rt>'))
+ok('Ruby 脱字注音 ^', res2.html.includes('<rt>shì jiè</rt>'))
+ok('幻灯片渲染', res2.html.includes('mf-slideshow') && (res2.html.match(/<img /g) || []).length >= 2, `img 数: ${(res2.html.match(/<img /g) || []).length}`)
+ok('幻灯片 overflow-x 行内', /overflow-x:auto/.test(res2.html))
+ok('Mermaid 占位', res2.html.includes('mf-mermaid') && decodeURIComponent(res2.html.match(/data-mermaid="([^"]*)"/)?.[1] || '').includes('graph LR'))
+ok('PlantUML 渲染为在线图', res2.html.includes('mf-plantuml') && /src="https:\/\/www\.plantuml\.com\/plantuml\/png\/[0-9A-Za-z_-]+"/.test(res2.html))
+ok('PlantUML 源码兜底', res2.html.includes('mf-plantuml-src') && res2.html.includes('Alice'))
 
 /* 注入主题并渲染到 DOM */
 const style = document.createElement('style')
@@ -83,6 +122,8 @@ const inline = inlineForWechat(host)
 ok('内联后无 class', !/\sclass="/.test(inline))
 ok('内联后有 style', /style="[^"]*color/.test(inline))
 ok('内联后无 <style>', !/<style/i.test(inline))
+ok('内联无 px 宽度（修复公众号半屏）', !/(?:^|;)\s*(?:max-|min-)?width:\s*\d+(?:\.\d+)?px/.test(inline),
+  (inline.match(/(?:^|;)\s*(?:max-|min-)?width:[^;"]+/g) || []).slice(0, 5).join(' '))
 ok('序号被物化为真实文本', /0[123]/.test(inline))
 ok('引用块边宽内联', /border-left:4px|border-left-width:4px/.test(inline))
 ok('引用块底色内联', /background-color:rgb/.test(inline))

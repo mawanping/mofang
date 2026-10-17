@@ -53,7 +53,6 @@ async function onExportHtml() {
 
 async function onExportPdf() {
   await store.flushSave()
-  store.previewMode = 'wechat'
   await new Promise((r) => setTimeout(r, 250))
   exportPdf()
 }

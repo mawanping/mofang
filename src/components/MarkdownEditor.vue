@@ -96,7 +96,13 @@ function insertAndSelect(text: string, selectText?: string) {
   emit('update:modelValue', v.state.doc.toString())
 }
 
-defineExpose({ insert, getSelected, insertAndSelect })
+defineExpose({
+  insert,
+  getSelected,
+  insertAndSelect,
+  /** 滚动容器（同步滚动用） */
+  scrollEl: (): HTMLElement | undefined => view.value?.scrollDOM,
+})
 </script>
 
 <template>

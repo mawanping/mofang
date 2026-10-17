@@ -9,6 +9,10 @@ import { markedEmoji } from './extensions/emoji'
 import { markedToc } from './extensions/toc'
 import { markedFootnotes, renderFootnoteList, resetFootnotes } from './extensions/footnote'
 import { markedMath } from './extensions/math'
+import { markedSlideshow } from './extensions/slideshow'
+import { markedRuby } from './extensions/ruby'
+import { markedMermaid } from './extensions/mermaid'
+import { markedPlantuml } from './extensions/plantuml'
 import { buildCustomExtensions, type CustomRule } from './customRules'
 
 export interface RenderResult {
@@ -30,6 +34,10 @@ function buildParser(customRules: CustomRule[]): Marked {
   m.use(markedMath() as never)
   m.use(markedToc() as never)
   m.use(markedFootnotes() as never)
+  m.use(markedSlideshow() as never)
+  m.use(markedRuby() as never)
+  m.use(markedMermaid() as never)
+  m.use(markedPlantuml() as never)
   m.use({ extensions: buildCustomExtensions(customRules) } as never)
   m.use(markupExtensions as never)
   return m

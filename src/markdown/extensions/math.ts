@@ -13,6 +13,9 @@ interface MathToken {
 
 const INLINE_RE = /^\$(?!\$)((?:\\.|[^\\\n$])+?)\$(?!\$)/
 const BLOCK_RE = /^\s{0,3}\$\$[ \t]*\n?([\s\S]+?)\n?[ \t]*\$\$[ \t]*(?:\n|$)/
+/* LaTeX 标准格式：\(行内\) 与 \[块级\] */
+const LATEX_INLINE_RE = /^\\\(([\s\S]+?)\\\)/
+const LATEX_BLOCK_RE = /^[ \t]*\\\[[ \t]*\n?([\s\S]+?)\n?[ \t]*\\\][ \t]*(?:\n|$)/
 
 function render(expr: string, display: boolean): string {
   const src = expr.trim()
@@ -73,6 +76,40 @@ export function markedMath(): { extensions: unknown[] } {
         },
         renderer(token: MathToken) {
           return render(token.text, false)
+        },
+      },
+      /* LaTeX 标准行内格式：\( ... \) */
+      {
+        name: 'latexInline',
+        level: 'inline',
+        start(src: string) {
+          const i = src.indexOf('\\(')
+          return i === -1 ? undefined : i
+        },
+        tokenizer(src: string) {
+          const m = LATEX_INLINE_RE.exec(src)
+          if (!m) return undefined
+          return { type: 'mathInline', raw: m[0], text: m[1], display: false } as MathToken
+        },
+        renderer(token: MathToken) {
+          return render(token.text, false)
+        },
+      },
+      /* LaTeX 标准块级格式：\[ ... \] */
+      {
+        name: 'latexBlock',
+        level: 'block',
+        start(src: string) {
+          const i = src.indexOf('\\[')
+          return i === -1 ? undefined : i
+        },
+        tokenizer(src: string) {
+          const m = LATEX_BLOCK_RE.exec(src)
+          if (!m) return undefined
+          return { type: 'mathBlock', raw: m[0], text: m[1], display: true } as MathToken
+        },
+        renderer(token: MathToken) {
+          return render(token.text, true) + '\n'
         },
       },
     ],

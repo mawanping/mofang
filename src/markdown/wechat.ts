@@ -23,6 +23,7 @@ const INLINE_PROPS = [
   'text-indent',
   'white-space',
   'word-break',
+  'overflow-x',
   'margin-top',
   'margin-right',
   'margin-bottom',
@@ -47,9 +48,9 @@ const INLINE_PROPS = [
   'border-top-right-radius',
   'border-bottom-left-radius',
   'border-bottom-right-radius',
-  'width',
-  'max-width',
-  'min-height',
+  // 注意：不内联 width / max-width / min-height。
+  // 预览容器是 390px 手机宽度，若把计算宽度写进每个块级元素的行内样式，
+  // 粘贴到公众号全宽编辑器后会保持半屏宽度。块级元素在公众号里默认自适应满宽。
   'display',
   'vertical-align',
   'list-style-type',
@@ -86,6 +87,11 @@ function materializePseudo(el: Element, pseudo: '::before' | '::after'): void {
 
 function inlineElement(el: Element): void {
   if (SKIP_TAGS.has(el.tagName)) return
+  // SVG（含根元素与子树）用表现属性定义样式，不参与 CSS 计算内联，
+  // 否则会把海量计算样式灌进行内 style，把 HTML 撑爆
+  if (el.tagName.toLowerCase() === 'svg' || (el as SVGElement).ownerSVGElement) return
+  // MathML 子树（KaTeX 的无障碍拷贝）同理：公众号用不到，跳过内联大幅瘦身
+  if (el.namespaceURI === 'http://www.w3.org/1998/Math/MathML') return
   const cs = getComputedStyle(el)
   const decl: string[] = []
   INLINE_PROPS.forEach((p) => {
@@ -106,8 +112,10 @@ function inlineElement(el: Element): void {
  */
 export function inlineForWechat(root: HTMLElement, opts: { keepClass?: boolean } = {}): string {
   const clone = root.cloneNode(true) as HTMLElement
-  // 物化伪元素（在克隆上操作，不影响预览）
+  // 物化伪元素（在克隆上操作，不影响预览）；SVG / MathML 子树跳过（无伪元素）
   clone.querySelectorAll('*').forEach((el) => {
+    if ((el as SVGElement).ownerSVGElement) return
+    if (el.namespaceURI === 'http://www.w3.org/1998/Math/MathML') return
     materializePseudo(el, '::before')
     materializePseudo(el, '::after')
   })
@@ -126,15 +134,31 @@ export function inlineForWechat(root: HTMLElement, opts: { keepClass?: boolean }
     host.remove()
   }
 
-  // 清理：去 class（除非保留）、去 data-*、去 script
+  // 清理：去 class（除非保留）、去 data-*、去 script。
+  // SVG 内部的 <style>（mermaid 图表样式）必须保留，否则图表样式全丢
   const out = clone
-  out.querySelectorAll('script,style,link,meta').forEach((n) => n.remove())
+  out.querySelectorAll('script,style,link,meta').forEach((n) => {
+    if (n.namespaceURI === 'http://www.w3.org/2000/svg') return
+    n.remove()
+  })
   const all = [out, ...Array.from(out.querySelectorAll('*'))]
   all.forEach((n) => {
     for (const attr of Array.from(n.attributes)) {
       if (attr.name === 'class' && !opts.keepClass) n.removeAttribute('class')
       if (attr.name === 'id') n.removeAttribute('id')
       if (attr.name.startsWith('data-')) n.removeAttribute(attr.name)
+    }
+    // 宽度兜底清洗：块级元素的 px 绝对宽度会让公众号内容保持半屏。
+    // 预览容器是 390px，KaTeX/mermaid 等的测量宽度全是 px，一并清掉，
+    // 只保留百分比宽度（如 img width:100%）
+    const s = n.getAttribute('style')
+    if (s && /width\s*:/i.test(s)) {
+      const cleaned = s
+        .replace(/(?:^|;)\s*(?:max-|min-)?width:\s*[0-9.]+px\s*(?=;|$)/gi, '')
+        .replace(/;\s*;$/, '')
+        .replace(/^;|;$/, '')
+      if (cleaned.trim()) n.setAttribute('style', cleaned)
+      else n.removeAttribute('style')
     }
   })
   return out.innerHTML
