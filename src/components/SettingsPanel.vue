@@ -67,7 +67,7 @@ async function chooseDir() {
 </script>
 
 <template>
-  <div class="fixed top-12 right-0 bottom-0 w-[380px] bg-mf-card border-l border-mf-line shadow-xl mf-slide z-40 flex flex-col">
+  <div class="fixed top-20 right-0 bottom-0 w-[380px] bg-mf-card border-l border-mf-line shadow-xl mf-slide z-40 flex flex-col">
     <div class="h-11 px-3 flex items-center justify-between border-b border-mf-line shrink-0">
       <span class="text-[13px] font-medium">设置</span>
       <button class="text-mf-ink-3 hover:text-mf-ink text-base leading-none" @click="store.settingsOpen = false">×</button>

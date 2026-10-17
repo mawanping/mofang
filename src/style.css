@@ -126,3 +126,15 @@ html[data-wb="dark"] .cm-editor .cm-content { caret-color: #6FB58F; }
 
 @keyframes mf-slide { from { transform: translateX(100%); } to { transform: none; } }
 .mf-slide { animation: mf-slide .22s cubic-bezier(.22,.61,.36,1); }
+
+/* 左栏独立配色：在面板上覆写 --color-mf-* 作用域变量，
+   面板内所有 mf-* 工具类自动换色，子组件零改动 */
+.mf-panel-tint--on {
+  --color-mf-primary: var(--pn-primary);
+  --color-mf-primary-soft: var(--pn-soft);
+  --color-mf-side: var(--pn-bg);
+  --color-mf-app: var(--pn-bg);
+  --color-mf-card: var(--pn-bg);
+  --color-mf-line: var(--pn-line);
+  --color-mf-line-2: var(--pn-line);
+}

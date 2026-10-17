@@ -18,6 +18,39 @@ export type EditorMode = 'markdown' | 'template'
 /** 工作台配色 */
 export type WbTheme = 'green' | 'white' | 'dark'
 
+/** 侧边栏独立配色 */
+export type SidenavTheme = 'green' | 'orange' | 'blue' | 'wine' | 'gray' | 'purple' | 'custom'
+
+/** 左栏面板独立配色预设 */
+export interface PanelPreset {
+  id: string
+  name: string
+  primary: string
+  soft: string
+  bg: string
+}
+
+export const PANEL_PRESETS: PanelPreset[] = [
+  { id: 'ink', name: '墨绿', primary: '#2F6B4F', soft: '#E4EEE8', bg: '#FBF9F4' },
+  { id: 'orange', name: '橘橙', primary: '#E8622C', soft: '#FDEBDD', bg: '#FDF6EF' },
+  { id: 'blue', name: '黛蓝', primary: '#2C5F8A', soft: '#E3EDF5', bg: '#F4F8FB' },
+  { id: 'purple', name: '紫棠', primary: '#7D5A8C', soft: '#F0E9F4', bg: '#F9F6FA' },
+  { id: 'coffee', name: '棕咖', primary: '#8A6D4B', soft: '#F2EBDF', bg: '#FAF6EE' },
+  { id: 'slate', name: '玄青', primary: '#3F4A5A', soft: '#E7EBEF', bg: '#F5F7F9' },
+]
+
+/** hex 混白得到浅底（amount 0-1，越大越浅） */
+export function tint(hex: string, amount = 0.88): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!m) return '#E4EEE8'
+  const n = parseInt(m[1], 16)
+  const r = (n >> 16) & 255
+  const g = (n >> 8) & 255
+  const b = n & 255
+  const mix = (c: number) => Math.round(c + (255 - c) * amount)
+  return `#${[mix(r), mix(g), mix(b)].map((c) => c.toString(16).padStart(2, '0')).join('')}`
+}
+
 export const useEditorStore = defineStore('editor', () => {
   /* ---------- 文档 ---------- */
   const docs = ref<DocRecord[]>([])
@@ -62,6 +95,41 @@ export const useEditorStore = defineStore('editor', () => {
     wbTheme.value = t
     localStorage.setItem('mf-wb', t)
     applyWb()
+  }
+
+  /* ---------- 左栏面板配色 ---------- */
+  const panelTheme = ref(localStorage.getItem('mf-panel-theme') || 'ink')
+  const panelCustom = ref(localStorage.getItem('mf-panel-custom') || '')
+
+  function setPanelTheme(id: string): void {
+    panelTheme.value = id
+    localStorage.setItem('mf-panel-theme', id)
+  }
+
+  function setPanelCustom(c: string): void {
+    panelCustom.value = c
+    localStorage.setItem('mf-panel-custom', c)
+  }
+
+  /** 当前面板配色（自定义优先；ink = 跟随全局不独立配色） */
+  const panelColors = computed((): PanelPreset | null => {
+    if (panelCustom.value) {
+      return {
+        id: 'custom',
+        name: '自定义',
+        primary: panelCustom.value,
+        soft: tint(panelCustom.value, 0.88),
+        bg: tint(panelCustom.value, 0.96),
+      }
+    }
+    return PANEL_PRESETS.find((p) => p.id === panelTheme.value) ?? null
+  })
+
+  /* 模式切换：模板模式自动带橙主题，Markdown 模式自动带青绿主题 */
+  function switchMode(m: EditorMode): void {
+    editorMode.value = m
+    themeId.value = m === 'template' ? 'beyond-orange' : 'ink-green'
+    markDirty()
   }
 
   let saveTimer: number | undefined
@@ -185,6 +253,7 @@ export const useEditorStore = defineStore('editor', () => {
     view, editorMode, previewMode, focusMode, leftPanel, aiPanelOpen, settingsOpen,
     customRules, aiProvider, aiApiKey, aiModel, aiPresets,
     wbTheme, setWbTheme,
+    panelTheme, panelCustom, panelColors, setPanelTheme, setPanelCustom, switchMode,
     loadAll, openDoc, newDoc, markDirty, flushSave, removeDoc, saveRules, saveAiConfig,
   }
 })

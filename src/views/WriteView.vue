@@ -6,7 +6,7 @@ import PreviewPane from '../components/PreviewPane.vue'
 import DocList from '../components/DocList.vue'
 import AssetPanel from '../components/AssetPanel.vue'
 import TopBar from '../components/TopBar.vue'
-import FormatPanel from '../components/FormatPanel.vue'
+import FormatToolbar from '../components/FormatToolbar.vue'
 
 const store = useEditorStore()
 const editorRef = ref<InstanceType<typeof MarkdownEditor>>()
@@ -19,6 +19,31 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 const leftWidth = ref(clamp(Number(localStorage.getItem('mf-left-w')) || 212, 150, 420))
 const previewWidth = ref(clamp(Number(localStorage.getItem('mf-right-w')) || 400, 320, 560))
 const leftCollapsed = ref(localStorage.getItem('mf-left-collapsed') === '1')
+
+/* ---------- 格式工具栏展开态（Word 式，持久化） ---------- */
+const toolbarOpen = ref(localStorage.getItem('mf-toolbar-open') !== '0')
+
+function toggleToolbar() {
+  toolbarOpen.value = !toolbarOpen.value
+  localStorage.setItem('mf-toolbar-open', toolbarOpen.value ? '1' : '0')
+}
+
+/* ---------- 左栏独立配色（CSS 变量作用域映射，子组件零改动） ---------- */
+const panelTinted = computed(() => store.panelTheme !== 'ink' || !!store.panelCustom)
+const panelVars = computed(() => {
+  const c = store.panelColors
+  if (!c) return {}
+  return {
+    '--pn-primary': c.primary,
+    '--pn-soft': c.soft,
+    '--pn-bg': c.bg,
+    '--pn-line': c.soft,
+  }
+})
+
+/* 左上角折叠图标（panel-left：矩形 + 左侧竖线） */
+const collapseIcon =
+  '<svg viewBox="0 0 16 16" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="3" width="12" height="10" rx="1.8"/><line x1="6.2" y1="3" x2="6.2" y2="13"/></svg>'
 
 function startResize(side: 'left' | 'right') {
   const e = window.event
@@ -48,22 +73,9 @@ function toggleLeft() {
   localStorage.setItem('mf-left-collapsed', leftCollapsed.value ? '1' : '0')
 }
 
-const modeLabel = computed(() => (store.editorMode === 'markdown' ? 'Markdown 编辑' : '公众号模板'))
-
-function switchMode(m: 'markdown' | 'template') {
-  store.editorMode = m
-  if (m === 'template') {
-    store.themeId = 'beyond-orange'
-    store.markDirty()
-  }
-}
-
-/* ---------- 格式库 ---------- */
-const formatOpen = ref(false)
-
+/* ---------- 格式工具栏动作 ---------- */
 function onFormatBlock(text: string, selectText?: string) {
   editorRef.value?.insertAndSelect(text, selectText)
-  formatOpen.value = false
 }
 
 function onFormatInline(style: string) {
@@ -71,13 +83,15 @@ function onFormatInline(style: string) {
   if (!ed) return
   const sel = ed.getSelected()
   if (sel) {
-    // 有选中文字：包上 span
     ed.insertAndSelect(`<span style="${style}">${sel}</span>`)
   } else {
-    // 无选中：插入占位并选中，直接打字即可替换
     ed.insertAndSelect(`<span style="${style}">文字</span>`, '文字')
   }
-  formatOpen.value = false
+}
+
+function onFormatReset() {
+  store.primaryColor = ''
+  store.markDirty()
 }
 
 /* 实时保存：输入即标记脏，800ms 后落库；失焦/关闭立即落库 */
@@ -142,14 +156,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   <div class="h-full flex flex-col bg-mf-canvas">
     <TopBar />
 
-    <div class="flex-1 flex min-h-0 gap-2 px-2 pb-2">
-      <!-- 左栏：折叠时收成窄边 -->
+    <div class="flex-1 flex min-h-0 gap-2 px-2 pb-2 relative">
+      <!-- 左栏：可独立配色，左上角图标折叠 -->
       <aside
         v-if="!leftCollapsed && !store.focusMode"
         class="shrink-0 bg-mf-side rounded-lg border border-mf-line overflow-hidden flex flex-col"
-        :style="{ width: leftWidth + 'px' }"
+        :class="panelTinted ? 'mf-panel-tint--on' : ''"
+        :style="[panelTinted ? panelVars : {}, { width: leftWidth + 'px' }]"
       >
-        <div class="flex border-b border-mf-line shrink-0">
+        <div class="flex items-center border-b border-mf-line shrink-0 pr-1">
+          <button
+            class="w-7 h-7 shrink-0 flex items-center justify-center text-mf-ink-3 hover:bg-black/[0.05] hover:text-mf-primary transition-colors"
+            title="收起左栏"
+            v-html="collapseIcon"
+            @click="toggleLeft"
+          ></button>
           <button
             class="flex-1 py-1.5 text-[11px]"
             :class="panelTab === 'docs' ? 'text-mf-primary font-medium border-b-2 border-mf-primary' : 'text-mf-ink-3'"
@@ -167,69 +188,32 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         </div>
       </aside>
 
-      <!-- 折叠态：窄边 + 展开按钮 -->
-      <div
+      <!-- 折叠态：编辑区左上角悬浮展开钮（WorkBuddy 式） -->
+      <button
         v-else-if="!store.focusMode"
-        class="w-6 shrink-0 bg-mf-side rounded-lg border border-mf-line flex flex-col items-center pt-2"
-      >
-        <button
-          class="w-5 h-8 rounded flex items-center justify-center text-mf-ink-3 hover:bg-mf-primary-soft hover:text-mf-primary transition-colors"
-          title="展开文档面板"
-          @click="toggleLeft"
-        >›</button>
-      </div>
+        class="absolute z-10 left-4 top-14 w-7 h-7 rounded-md bg-mf-card border border-mf-line shadow-sm flex items-center justify-center text-mf-ink-3 hover:text-mf-primary hover:border-mf-primary transition-colors"
+        title="展开左栏"
+        v-html="collapseIcon"
+        @click="toggleLeft"
+      ></button>
 
-      <!-- 左分隔条：拖拽调宽 + 悬停显示收起按钮 -->
+      <!-- 左分隔条：拖拽调宽 -->
       <div
         v-if="!leftCollapsed && !store.focusMode"
         class="group w-1.5 shrink-0 cursor-col-resize flex flex-col items-center justify-center rounded-full hover:bg-mf-primary/30 transition-colors"
-        title="左右拖动调节宽度，双击收起"
+        title="左右拖动调节宽度"
         @mousedown.prevent="startResize('left')"
-        @dblclick="toggleLeft"
-      >
-        <button
-          class="w-3 h-6 rounded-full bg-mf-card border border-mf-line-2 text-[9px] leading-none text-mf-ink-4 opacity-0 group-hover:opacity-100 hover:text-mf-primary hover:border-mf-primary transition-all flex items-center justify-center"
-          title="收起左栏"
-          @click.stop="toggleLeft"
-        >‹</button>
-      </div>
+      ></div>
 
-      <!-- 中栏：编辑器 -->
-      <main class="flex-1 min-w-0 bg-mf-card rounded-lg border border-mf-line flex flex-col overflow-hidden">
-        <!-- 编辑模式切换 + 格式库入口 -->
-        <div class="h-9 px-2.5 flex items-center gap-2 border-b border-mf-line shrink-0 bg-mf-side">
-          <div class="flex items-center p-0.5 rounded-md bg-black/[0.05]">
-            <button
-              class="px-2.5 py-0.5 rounded text-[11.5px] transition-colors"
-              :class="store.editorMode === 'markdown' ? 'bg-white text-mf-primary font-medium shadow-sm' : 'text-mf-ink-3'"
-              @click="switchMode('markdown')"
-            >Markdown</button>
-            <button
-              class="px-2.5 py-0.5 rounded text-[11.5px] transition-colors"
-              :class="store.editorMode === 'template' ? 'bg-white text-mf-primary font-medium shadow-sm' : 'text-mf-ink-3'"
-              @click="switchMode('template')"
-            >公众号模板</button>
-          </div>
-          <div class="relative">
-            <button
-              class="px-2 py-0.5 rounded text-[11.5px] border transition-colors"
-              :class="formatOpen ? 'border-mf-primary text-mf-primary bg-mf-primary-soft' : 'border-mf-line-2 text-mf-ink-3 hover:border-mf-primary hover:text-mf-primary'"
-              @click="formatOpen = !formatOpen"
-            >格式 ▾</button>
-            <FormatPanel
-              :open="formatOpen"
-              @block="onFormatBlock"
-              @inline="onFormatInline"
-              @close="formatOpen = false"
-            />
-          </div>
-          <span class="text-[10.5px] text-mf-ink-4 truncate">
-            {{ store.editorMode === 'markdown' ? '写 Markdown，右侧出公众号效果' : '已切到内容之外橙主题，序号/引用/色条自动生效' }}
-          </span>
-          <div class="flex-1"></div>
-          <span class="text-[10.5px] text-mf-ink-4 shrink-0">{{ store.wordCount }} 字 · {{ store.readMinutes }} 分钟</span>
-        </div>
-
+      <!-- 中栏：格式工具栏 + 编辑器 -->
+      <main class="flex-1 min-w-0 bg-mf-card rounded-lg border border-mf-line flex flex-col overflow-hidden relative">
+        <FormatToolbar
+          :open="toolbarOpen"
+          @toggle="toggleToolbar"
+          @block="onFormatBlock"
+          @inline="onFormatInline"
+          @reset="onFormatReset"
+        />
         <div class="flex-1 min-h-0">
           <MarkdownEditor :model-value="store.content" @update:model-value="onInput" ref="editorRef" />
         </div>
@@ -237,7 +221,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
       <!-- 右栏：实时预览 -->
       <template v-if="!store.focusMode">
-        <!-- 右分隔条 -->
         <div
           class="w-1.5 shrink-0 cursor-col-resize rounded-full hover:bg-mf-primary/30 transition-colors"
           title="左右拖动调节宽度"
@@ -267,7 +250,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <span class="w-1.5 h-1.5 rounded-full" :class="store.saveState === 'saved' ? 'bg-emerald-500' : store.saveState === 'dirty' ? 'bg-amber-400' : 'bg-mf-primary'"></span>
         {{ store.saveState === 'saved' ? '已自动保存' : store.saveState === 'dirty' ? '正在输入…' : '保存中' }}
       </span>
-      <span>主题 {{ modeLabel }}</span>
+      <span>{{ store.wordCount }} 字 · {{ store.readMinutes }} 分钟</span>
       <span v-if="store.lastSavedAt">上次保存 {{ new Date(store.lastSavedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) }}</span>
       <div class="flex-1"></div>
       <span>数据仅存本地浏览器</span>

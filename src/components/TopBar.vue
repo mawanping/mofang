@@ -1,21 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useEditorStore } from '../stores/editor'
-import { THEMES } from '../themes'
-import { invalidateParsers } from '../markdown/render'
+import { useEditorStore, PANEL_PRESETS } from '../stores/editor'
 import { copyHtmlToClipboard, inlineForWechat } from '../markdown/wechat'
-import { countWords } from '../stores/db'
 import { saveToFolder, exportHtml, exportPdf, dirSupported } from '../utils/exporters'
 
 const store = useEditorStore()
 const toast = ref('')
 const saving = ref(false)
-
-const themeOptions = computed(() =>
-  THEMES.map((t) => ({ id: t.id, name: t.name, desc: t.desc, primary: t.primary })),
-)
-
-const activeTheme = computed(() => THEMES.find((t) => t.id === store.themeId) ?? THEMES[0])
 
 const saveLabel = computed(() => {
   if (store.saveState === 'saving') return '保存中…'
@@ -66,92 +57,106 @@ async function onExportPdf() {
   await new Promise((r) => setTimeout(r, 250))
   exportPdf()
 }
-
-function onPrimaryChange(e: Event) {
-  const v = (e.target as HTMLInputElement).value
-  store.primaryColor = v
-  store.markDirty()
-}
-
-function resetPrimary() {
-  store.primaryColor = ''
-  store.markDirty()
-}
 </script>
 
 <template>
-  <div class="h-12 px-3 flex items-center gap-2 bg-mf-card border-b border-mf-line shrink-0">
-    <div class="flex items-center gap-1.5 mr-1">
-      <div class="w-6 h-6 rounded-md bg-mf-primary flex items-center justify-center">
-        <span class="text-white text-[13px] font-serif leading-none">墨</span>
+  <div class="bg-mf-card border-b border-mf-line shrink-0">
+    <!-- 行1：品牌 / 标题 / 操作 -->
+    <div class="h-11 px-3 flex items-center gap-2">
+      <div class="flex items-center gap-1.5 mr-1">
+        <div class="w-6 h-6 rounded-md bg-mf-primary flex items-center justify-center">
+          <span class="text-white text-[13px] font-serif leading-none">墨</span>
+        </div>
+        <span class="text-[13px] font-medium tracking-wide">墨坊</span>
       </div>
-      <span class="text-[13px] font-medium tracking-wide">墨坊</span>
-    </div>
 
-    <input
-      :value="store.title"
-      class="w-44 px-2.5 py-1 text-[13px] rounded-md bg-mf-app border border-mf-line focus:border-mf-primary outline-none transition-colors"
-      placeholder="文章标题"
-      @input="store.title = ($event.target as HTMLInputElement).value; store.markDirty()"
-    />
+      <input
+        :value="store.title"
+        class="w-44 px-2.5 py-1 text-[13px] rounded-md bg-mf-app border border-mf-line focus:border-mf-primary outline-none transition-colors"
+        placeholder="文章标题"
+        @input="store.title = ($event.target as HTMLInputElement).value; store.markDirty()"
+      />
 
-    <div class="flex items-center gap-1 px-2 py-1 rounded-md bg-mf-app border border-mf-line">
-      <span class="text-[11px] text-mf-ink-3">主题</span>
-      <select
-        :value="store.themeId"
-        class="bg-transparent text-[11.5px] outline-none cursor-pointer"
-        @change="store.themeId = ($event.target as HTMLSelectElement).value; store.markDirty()"
-      >
-        <option v-for="t in themeOptions" :key="t.id" :value="t.id">{{ t.name }}</option>
-      </select>
-    </div>
+      <div class="flex-1"></div>
 
-    <label class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-mf-app border border-mf-line cursor-pointer" title="主色，改动全篇联动">
-      <span class="w-3.5 h-3.5 rounded-sm border border-mf-line-2" :style="{ background: store.primaryColor || activeTheme.primary }"></span>
-      <input type="color" class="w-0 h-0 opacity-0 absolute" :value="store.primaryColor || activeTheme.primary" @input="onPrimaryChange" />
-      <span class="text-[11px] text-mf-ink-3">{{ store.primaryColor || activeTheme.primary }}</span>
-      <button v-if="store.primaryColor" class="text-[10px] text-mf-ink-4 hover:text-mf-primary" @click.prevent="resetPrimary">重置</button>
-    </label>
+      <button
+        class="px-2.5 py-1 rounded-md text-[12px] border border-mf-line-2 hover:border-mf-primary hover:text-mf-primary transition-colors"
+        @click="store.aiPanelOpen = !store.aiPanelOpen"
+      >AI 配图</button>
 
-    <div class="flex-1"></div>
-
-    <button
-      class="px-2.5 py-1 rounded-md text-[12px] border border-mf-line-2 hover:border-mf-primary hover:text-mf-primary transition-colors"
-      @click="store.aiPanelOpen = !store.aiPanelOpen"
-    >AI 配图</button>
-
-    <div class="relative">
       <button
         class="px-2.5 py-1 rounded-md text-[12px] border border-mf-line-2 hover:border-mf-primary hover:text-mf-primary transition-colors disabled:opacity-50"
         :disabled="saving"
         @click="onSaveMd"
       >{{ saving ? '…' : '保存' }}</button>
+
+      <button
+        class="px-2.5 py-1 rounded-md text-[12px] border border-mf-line-2 hover:border-mf-primary hover:text-mf-primary transition-colors"
+        @click="onExportPdf"
+      >PDF</button>
+
+      <button
+        class="px-2.5 py-1 rounded-md text-[12px] border border-mf-line-2 hover:border-mf-primary hover:text-mf-primary transition-colors"
+        @click="onExportHtml"
+      >HTML</button>
+
+      <button
+        class="px-3 py-1 rounded-md text-[12px] bg-mf-primary text-white font-medium hover:opacity-90 transition-opacity"
+        @click="onCopy"
+      >复制到公众号</button>
+
+      <button
+        class="w-7 h-7 rounded-md text-[13px] text-mf-ink-3 hover:bg-black/[0.05] transition-colors"
+        title="设置"
+        @click="store.settingsOpen = !store.settingsOpen"
+      >⚙</button>
+
+      <div
+        v-if="toast"
+        class="absolute right-3 top-11 px-3 py-1.5 rounded-md bg-mf-ink text-white text-[11.5px] mf-fade z-50 shadow-lg"
+      >{{ toast }}</div>
     </div>
 
-    <button
-      class="px-2.5 py-1 rounded-md text-[12px] border border-mf-line-2 hover:border-mf-primary hover:text-mf-primary transition-colors"
-      @click="onExportPdf"
-    >PDF</button>
+    <!-- 行2：编辑模式切换 + 左栏配色 -->
+    <div class="h-9 px-3 flex items-center gap-3 border-t border-mf-line bg-mf-side">
+      <div class="flex items-center p-0.5 rounded-md bg-black/[0.05]" title="编辑模式">
+        <button
+          class="px-2.5 py-0.5 rounded text-[11.5px] transition-colors"
+          :class="store.editorMode === 'markdown' ? 'bg-white text-mf-primary font-medium shadow-sm' : 'text-mf-ink-3'"
+          @click="store.switchMode('markdown')"
+        >Markdown</button>
+        <button
+          class="px-2.5 py-0.5 rounded text-[11.5px] transition-colors"
+          :class="store.editorMode === 'template' ? 'bg-white text-mf-primary font-medium shadow-sm' : 'text-mf-ink-3'"
+          @click="store.switchMode('template')"
+        >公众号模板</button>
+      </div>
 
-    <button
-      class="px-2.5 py-1 rounded-md text-[12px] border border-mf-line-2 hover:border-mf-primary hover:text-mf-primary transition-colors"
-      @click="onExportHtml"
-    >HTML</button>
+      <div class="w-px h-4 bg-mf-line-2"></div>
 
-    <button
-      class="px-3 py-1 rounded-md text-[12px] bg-mf-primary text-white font-medium hover:opacity-90 transition-opacity"
-      @click="onCopy"
-    >复制到公众号</button>
+      <span class="text-[11px] text-mf-ink-3 shrink-0">左栏配色</span>
+      <div class="flex items-center gap-1.5">
+        <button
+          v-for="p in PANEL_PRESETS"
+          :key="p.id"
+          class="w-4 h-4 rounded-full border transition-transform hover:scale-110"
+          :class="!store.panelCustom && store.panelTheme === p.id ? 'ring-1.5 ring-offset-1 ring-mf-primary border-transparent' : 'border-black/10'"
+          :style="{ background: p.primary }"
+          :title="`左栏配色：${p.name}`"
+          @click="store.setPanelTheme(p.id)"
+        ></button>
+        <label
+          class="w-4 h-4 rounded-full cursor-pointer border flex items-center justify-center text-[9px] transition-colors"
+          :class="store.panelCustom ? 'border-transparent ring-1.5 ring-offset-1 ring-mf-primary text-mf-ink-4' : 'border-dashed border-mf-ink-4 text-mf-ink-4 hover:border-mf-primary hover:text-mf-primary'"
+          title="自定义左栏主色"
+        >
+          ＋
+          <input type="color" class="w-0 h-0 opacity-0 absolute" :value="store.panelCustom || '#2F6B4F'" @input="store.setPanelCustom(($event.target as HTMLInputElement).value)" />
+        </label>
+      </div>
 
-    <button
-      class="w-7 h-7 rounded-md text-[13px] text-mf-ink-3 hover:bg-black/[0.05] transition-colors"
-      title="设置"
-      @click="store.settingsOpen = !store.settingsOpen"
-    >⚙</button>
-
-    <div
-      v-if="toast"
-      class="absolute right-3 top-12 px-3 py-1.5 rounded-md bg-mf-ink text-white text-[11.5px] mf-fade z-50 shadow-lg"
-    >{{ toast }}</div>
+      <div class="flex-1"></div>
+      <span class="text-[10px] text-mf-ink-4">{{ saveLabel }}</span>
+    </div>
   </div>
 </template>
