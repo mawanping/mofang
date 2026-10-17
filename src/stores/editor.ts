@@ -72,6 +72,12 @@ export const useEditorStore = defineStore('editor', () => {
   const previewMode = ref<'edit' | 'wechat'>('edit')
   const focusMode = ref(false)
   const leftPanel = ref<'docs' | 'drafts' | 'ideas' | 'assets'>('docs')
+  /* 左栏折叠态：TopBar 与 WriteView 共用，持久化 */
+  const leftCollapsed = ref(localStorage.getItem('mf-left-collapsed') === '1')
+  function toggleLeftPanel(): void {
+    leftCollapsed.value = !leftCollapsed.value
+    localStorage.setItem('mf-left-collapsed', leftCollapsed.value ? '1' : '0')
+  }
   const aiPanelOpen = ref(false)
   const settingsOpen = ref(false)
 
@@ -250,7 +256,7 @@ export const useEditorStore = defineStore('editor', () => {
   return {
     docs, currentId, title, content, kind, themeId, primaryColor,
     saveState, lastSavedAt, wordCount, readMinutes,
-    view, editorMode, previewMode, focusMode, leftPanel, aiPanelOpen, settingsOpen,
+    view, editorMode, previewMode, focusMode, leftPanel, leftCollapsed, toggleLeftPanel, aiPanelOpen, settingsOpen,
     customRules, aiProvider, aiApiKey, aiModel, aiPresets,
     wbTheme, setWbTheme,
     panelTheme, panelCustom, panelColors, setPanelTheme, setPanelCustom, switchMode,

@@ -70,6 +70,18 @@ async function onExportPdf() {
         <span class="text-[13px] font-medium tracking-wide">墨坊</span>
       </div>
 
+      <!-- 左栏折叠开关：常驻顶栏，不遮挡编辑区内容 -->
+      <button
+        class="w-7 h-7 rounded-md flex items-center justify-center transition-colors"
+        :class="store.leftCollapsed ? 'bg-black/[0.06] text-mf-primary' : 'text-mf-ink-3 hover:bg-black/[0.05] hover:text-mf-primary'"
+        :title="store.leftCollapsed ? '展开左栏' : '收起左栏'"
+        @click="store.toggleLeftPanel"
+      >
+        <svg viewBox="0 0 16 16" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+          <rect x="2" y="3" width="12" height="10" rx="1.8"/><line x1="6.2" y1="3" x2="6.2" y2="13"/>
+        </svg>
+      </button>
+
       <input
         :value="store.title"
         class="w-44 px-2.5 py-1 text-[13px] rounded-md bg-mf-app border border-mf-line focus:border-mf-primary outline-none transition-colors"

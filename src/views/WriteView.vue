@@ -18,7 +18,6 @@ const panelTab = ref<'docs' | 'assets'>('docs')
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 const leftWidth = ref(clamp(Number(localStorage.getItem('mf-left-w')) || 212, 150, 420))
 const previewWidth = ref(clamp(Number(localStorage.getItem('mf-right-w')) || 400, 320, 560))
-const leftCollapsed = ref(localStorage.getItem('mf-left-collapsed') === '1')
 
 /* ---------- 格式工具栏展开态（Word 式，持久化） ---------- */
 const toolbarOpen = ref(localStorage.getItem('mf-toolbar-open') !== '0')
@@ -66,11 +65,6 @@ function startResize(side: 'left' | 'right') {
   document.addEventListener('mouseup', onUp)
   document.body.style.cursor = 'col-resize'
   document.body.style.userSelect = 'none'
-}
-
-function toggleLeft() {
-  leftCollapsed.value = !leftCollapsed.value
-  localStorage.setItem('mf-left-collapsed', leftCollapsed.value ? '1' : '0')
 }
 
 /* ---------- 格式工具栏动作 ---------- */
@@ -157,9 +151,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     <TopBar />
 
     <div class="flex-1 flex min-h-0 gap-2 px-2 pb-2 relative">
-      <!-- 左栏：可独立配色，左上角图标折叠 -->
+      <!-- 左栏：可独立配色，左上角图标折叠（折叠/展开开关在 TopBar 墨坊旁） -->
       <aside
-        v-if="!leftCollapsed && !store.focusMode"
+        v-if="!store.leftCollapsed && !store.focusMode"
         class="shrink-0 bg-mf-side rounded-lg border border-mf-line overflow-hidden flex flex-col"
         :class="panelTinted ? 'mf-panel-tint--on' : ''"
         :style="[panelTinted ? panelVars : {}, { width: leftWidth + 'px' }]"
@@ -169,7 +163,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             class="w-7 h-7 shrink-0 flex items-center justify-center text-mf-ink-3 hover:bg-black/[0.05] hover:text-mf-primary transition-colors"
             title="收起左栏"
             v-html="collapseIcon"
-            @click="toggleLeft"
+            @click="store.toggleLeftPanel"
           ></button>
           <button
             class="flex-1 py-1.5 text-[11px]"
@@ -188,18 +182,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         </div>
       </aside>
 
-      <!-- 折叠态：编辑区左上角悬浮展开钮（WorkBuddy 式） -->
-      <button
-        v-else-if="!store.focusMode"
-        class="absolute z-10 left-4 top-14 w-7 h-7 rounded-md bg-mf-card border border-mf-line shadow-sm flex items-center justify-center text-mf-ink-3 hover:text-mf-primary hover:border-mf-primary transition-colors"
-        title="展开左栏"
-        v-html="collapseIcon"
-        @click="toggleLeft"
-      ></button>
-
       <!-- 左分隔条：拖拽调宽 -->
       <div
-        v-if="!leftCollapsed && !store.focusMode"
+        v-if="!store.leftCollapsed && !store.focusMode"
         class="group w-1.5 shrink-0 cursor-col-resize flex flex-col items-center justify-center rounded-full hover:bg-mf-primary/30 transition-colors"
         title="左右拖动调节宽度"
         @mousedown.prevent="startResize('left')"
