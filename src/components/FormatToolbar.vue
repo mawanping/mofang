@@ -37,13 +37,8 @@ function applyBg(c: string) {
 
 <template>
   <div class="border-b border-mf-line bg-mf-side shrink-0 select-none">
-    <!-- 行1：折叠开关 + 区块格式 -->
+    <!-- 行1：区块格式（折叠态时右下角放展开钮） -->
     <div class="h-7 flex items-center gap-1.5 px-2">
-      <button
-        class="w-5 h-5 rounded flex items-center justify-center text-mf-ink-3 hover:bg-mf-primary-soft hover:text-mf-primary transition-colors text-[10px]"
-        :title="open ? '收起格式工具栏' : '展开格式工具栏'"
-        @click="emit('toggle')"
-      >{{ open ? '▴' : '▾' }}</button>
       <span class="text-[10.5px] text-mf-ink-4 w-11 shrink-0">区块格式</span>
       <button
         v-for="b in BLOCKS"
@@ -51,6 +46,15 @@ function applyBg(c: string) {
         class="px-2 py-0.5 rounded border border-mf-line text-[11px] text-mf-ink-2 hover:border-mf-primary hover:text-mf-primary transition-colors"
         @click="emit('block', b.text, b.select)"
       >{{ b.name }}</button>
+      <div class="flex-1"></div>
+      <button
+        v-if="!open"
+        class="w-6 h-6 rounded flex items-center justify-center text-mf-ink-3 hover:bg-mf-primary-soft hover:text-mf-primary transition-colors"
+        title="展开格式工具栏"
+        @click="emit('toggle')"
+      >
+        <svg viewBox="0 0 16 16" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+      </button>
     </div>
 
     <!-- 展开：行内字色 / 底色 / 字号 / 我的规则 -->
@@ -113,6 +117,14 @@ function applyBg(c: string) {
           >{{ r.symbol }}</button>
         </template>
         <span v-else class="text-[10px] text-mf-ink-4">暂无启用的规则，去设置里添加</span>
+        <div class="flex-1"></div>
+        <button
+          class="w-6 h-6 rounded flex items-center justify-center text-mf-ink-3 hover:bg-mf-primary-soft hover:text-mf-primary transition-colors"
+          title="收起格式工具栏"
+          @click="emit('toggle')"
+        >
+          <svg viewBox="0 0 16 16" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10l4-4 4 4"/></svg>
+        </button>
       </div>
     </template>
   </div>

@@ -16,7 +16,6 @@ const INLINE_PROPS = [
   'font-size',
   'font-weight',
   'font-style',
-  'line-height',
   'letter-spacing',
   'text-align',
   'text-decoration',
@@ -63,6 +62,30 @@ function px(v: string): string {
   return v
 }
 
+/**
+ * 行高转无单位相对值。
+ * 预览容器字号 14px → 行高 21px 是绝对值，粘到公众号后：
+ * ① 大字号文字（28px）配 21px 行高会被压扁；② 与公众号默认行距打架。
+ * 用 px 行高 / 元素字号得到比例（如 1.5），输出 line-height:1.5，
+ * 任何字号下比例恒定，公众号阅读行距正常。
+ */
+function relLineHeight(cs: CSSStyleDeclaration): string | null {
+  const lh = cs.lineHeight
+  if (!lh || lh === 'normal') return null
+  const fs = parseFloat(cs.fontSize)
+  const lhPx = parseFloat(lh)
+  if (!fs || !lhPx) return null
+  const ratio = lhPx / fs
+  if (ratio < 1.2 || ratio > 2.4) return null
+  return `line-height:${ratio.toFixed(2)}`
+}
+
+/** 块级标签集合：顶层强制 width:100%，对抗公众号粘贴容器的任何宽度限制 */
+const BLOCK_TAGS = new Set([
+  'P', 'SECTION', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+  'BLOCKQUOTE', 'UL', 'OL', 'PRE', 'TABLE', 'FIGURE', 'HR', 'NAV',
+])
+
 function materializePseudo(el: Element, pseudo: '::before' | '::after'): void {
   const cs = getComputedStyle(el, pseudo)
   const content = cs.content
@@ -100,6 +123,9 @@ function inlineElement(el: Element): void {
     if (v === 'normal' && (p === 'font-style' || p === 'text-decoration')) return
     decl.push(`${p}:${px(v)}`)
   })
+  // 行高单独处理：转无单位相对值（见 relLineHeight 注释）
+  const lh = relLineHeight(cs)
+  if (lh) decl.push(lh)
   const existing = el.getAttribute('style')
   if (existing) decl.unshift(existing.replace(/;$/, ''))
   el.setAttribute('style', decl.join(';'))
@@ -140,6 +166,14 @@ export function inlineForWechat(root: HTMLElement, opts: { keepClass?: boolean }
   out.querySelectorAll('script,style,link,meta').forEach((n) => {
     if (n.namespaceURI === 'http://www.w3.org/2000/svg') return
     n.remove()
+  })
+  /* 顶层块级元素强制满宽：对抗公众号粘贴容器可能继承的任何宽度限制 */
+  Array.from(out.children).forEach((el) => {
+    if (!BLOCK_TAGS.has(el.tagName)) return
+    const s = el.getAttribute('style') || ''
+    if (!/width:\s*100%/.test(s)) {
+      el.setAttribute('style', s ? `${s.replace(/;$/, '')};width:100%` : 'width:100%')
+    }
   })
   const all = [out, ...Array.from(out.querySelectorAll('*'))]
   all.forEach((n) => {

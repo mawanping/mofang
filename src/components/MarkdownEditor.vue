@@ -5,6 +5,7 @@ import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLi
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput } from '@codemirror/language'
+import { inlineStyleDecorator } from './inlineDecorator'
 
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void; (e: 'save'): void }>()
@@ -22,6 +23,7 @@ const extensions: Extension[] = [
   markdown({ base: markdownLanguage, codeLanguages: [] }),
   syntaxHighlighting(defaultHighlightStyle),
   highlightActiveLine(),
+  inlineStyleDecorator,
   keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
   EditorView.lineWrapping,
   EditorView.updateListener.of((u) => {
