@@ -118,11 +118,11 @@ defineExpose({ build, output })
       <span class="text-[10px] text-mf-ink-4">内联样式版 · 即粘贴后的真实效果</span>
     </div>
 
-    <!-- 预览主体：白底 + 一张居中的悬浮纸片（内容少时垂直居中，超长时正常滚动） -->
+    <!-- 预览主体：一张贯穿上下、水平居中的竖向长条（无圆角无阴影） -->
     <div
       ref="output"
-      class="mf-scroll flex-1 flex flex-col p-3 transition-colors"
-      :class="dark ? 'bg-[#0E0E11]' : 'bg-white'"
+      class="mf-scroll flex-1 flex flex-col"
+      :class="dark ? 'bg-[#141416]' : 'bg-[#FAFAF9]'"
     >
       <div
         class="pv-paper"
