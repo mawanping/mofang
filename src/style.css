@@ -100,7 +100,7 @@ body {
 .cm-editor {
   height: 100%;
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: 16px;
   background: var(--color-mf-card);
 }
 .cm-editor .cm-scroller { line-height: 1.85; padding: 12px 0; }
@@ -120,6 +120,129 @@ html[data-wb="dark"] .cm-editor .cm-content { caret-color: #6FB58F; }
 
 /* KaTeX 样式 */
 @import "katex/dist/katex.min.css";
+
+/* ============================================================
+   编辑区块级实时排版（# 标题 / > 引用 / 列表 / 代码块 / 表格）
+   标记字符淡化保留，正文按语义换字号字重 —— 敲完即成型
+   ============================================================ */
+
+/* 标记字符（### / > / - / 1. / ---）：淡化 + 等宽小字 */
+.cm-mf-mark {
+  color: #C2BDAD;
+  font-size: 0.8em;
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+}
+html[data-wb="dark"] .cm-mf-mark { color: #6B675C; }
+
+/* ---------- 标题：无衬线 + 层级字号 ---------- */
+.cm-mf-h1, .cm-mf-h2, .cm-mf-h3, .cm-mf-h4, .cm-mf-h5, .cm-mf-h6 {
+  font-family: var(--font-sans);
+  color: var(--color-mf-ink);
+  letter-spacing: -0.01em;
+}
+.cm-mf-h1 { font-size: 30px; font-weight: 700; line-height: 1.4; }
+.cm-mf-h2 { font-size: 25px; font-weight: 700; line-height: 1.45; }
+.cm-mf-h3 { font-size: 21px; font-weight: 700; line-height: 1.5; }
+.cm-mf-h4 { font-size: 18px; font-weight: 600; line-height: 1.55; }
+.cm-mf-h5 { font-size: 16.5px; font-weight: 600; line-height: 1.6; }
+.cm-mf-h6 { font-size: 16px; font-weight: 600; line-height: 1.6; color: var(--color-mf-ink-3); }
+
+/* 一级标题下方一条细线，视觉上像章首 */
+.cm-mf-h1-line { border-bottom: 1px solid var(--color-mf-line); }
+
+/* ---------- 引用：左侧竖条 + 淡底 + 灰字 ---------- */
+.cm-mf-quote {
+  border-left: 3px solid var(--color-mf-primary);
+  padding-left: 12px;
+  margin-left: 1px;
+  background: color-mix(in srgb, var(--color-mf-primary-soft) 45%, transparent);
+  border-radius: 0 4px 4px 0;
+}
+.cm-mf-quote-text {
+  color: var(--color-mf-ink-2);
+  font-family: var(--font-sans);
+  font-size: 0.97em;
+}
+
+/* ---------- alert 卡片 ---------- */
+.cm-mf-alert {
+  color: var(--color-mf-primary);
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-family: var(--font-sans);
+}
+.cm-mf-alert-text {
+  color: var(--color-mf-ink-2);
+  font-family: var(--font-sans);
+  font-weight: 500;
+}
+
+/* ---------- 列表 ---------- */
+.cm-mf-li-line { padding-top: 1px; padding-bottom: 1px; }
+.cm-mf-li-text { font-family: var(--font-sans); color: var(--color-mf-ink); }
+
+/* ---------- 代码块 ---------- */
+.cm-mf-code-line {
+  background: #F5F4EF;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+html[data-wb="dark"] .cm-mf-code-line { background: #24231F; }
+.cm-mf-code-fence { color: #A8A392; font-size: 0.8em; }
+
+/* ---------- 行内标记：**粗体** `代码` ==高亮== ++下划线++ ~~删除~~ ^上标^ *斜体* ---------- */
+.cm-mf-strong { font-weight: 700; font-family: var(--font-sans); }
+.cm-mf-em { font-style: italic; }
+.cm-mf-inline-code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: #F1EFE8;
+  color: #C2410C;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+html[data-wb="dark"] .cm-mf-inline-code { background: #2C2A25; color: #E8A87C; }
+.cm-mf-highlight {
+  background: linear-gradient(transparent 55%, #FCF0B8 55%);
+  font-weight: 500;
+}
+html[data-wb="dark"] .cm-mf-highlight { background: linear-gradient(transparent 55%, #4A4022 55%); }
+.cm-mf-underline { text-decoration: underline; text-decoration-color: var(--color-mf-primary); text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
+.cm-mf-strike { text-decoration: line-through; color: var(--color-mf-ink-3); }
+.cm-mf-sup { vertical-align: super; font-size: 0.72em; }
+
+/* ---------- 分隔线 ---------- */
+.cm-mf-hr {
+  border-top: 1px solid var(--color-mf-line-2);
+  margin-top: 14px;
+  margin-bottom: 14px;
+  opacity: 0.85;
+}
+
+/* ---------- 表格 ---------- */
+.cm-mf-table {
+  font-family: var(--font-mono);
+  font-size: 14.5px;
+  background: #FAF9F5;
+}
+html[data-wb="dark"] .cm-mf-table { background: #24231F; }
+.cm-mf-table-sep { background: #F1EFE8; font-size: 14px; }
+html[data-wb="dark"] .cm-mf-table-sep { background: #2C2A25; }
+
+/* 深色工作台下标题/引用文字反色 */
+html[data-wb="dark"] .cm-mf-h1,
+html[data-wb="dark"] .cm-mf-h2,
+html[data-wb="dark"] .cm-mf-h3,
+html[data-wb="dark"] .cm-mf-h4,
+html[data-wb="dark"] .cm-mf-h5,
+html[data-wb="dark"] .cm-mf-li-text { color: #E6E3DA; }
+html[data-wb="dark"] .cm-mf-h6 { color: #A8A392; }
+html[data-wb="dark"] .cm-mf-quote-text,
+html[data-wb="dark"] .cm-mf-alert-text { color: #C9C5B9; }
 
 @keyframes mf-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .mf-fade { animation: mf-fade-in .18s ease-out; }

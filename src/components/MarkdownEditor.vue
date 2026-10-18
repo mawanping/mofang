@@ -1,11 +1,39 @@
 <script setup lang="ts">
 import { ref, shallowRef, onMounted, onBeforeUnmount, watch } from 'vue'
-import { EditorState, type Extension } from '@codemirror/state'
+import { EditorState, Prec, type Extension } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput } from '@codemirror/language'
 import { inlineStyleDecorator } from './inlineDecorator'
+import { blockStyleDecorator } from './blockDecorator'
+
+/**
+ * 空列表项按回车 → 跳出列表（清掉 `- ` / `1. ` 标记）。
+ * lang-markdown 自带的续行在空项时不会自动退出，会导致后面想写
+ * 标题时被续成 `- ### 标题`，看起来像「标记不生效」。
+ */
+const exitEmptyListOnEnter = Prec.highest(
+  keymap.of([
+    {
+      key: 'Enter',
+      run: (view) => {
+        const { state } = view
+        const sel = state.selection.main
+        if (!sel.empty) return false
+        const line = state.doc.lineAt(sel.from)
+        if (sel.from !== line.to) return false
+        if (!/^[ \t]*(?:[-*+]|\d{1,3}[.)])[ \t]+$/.test(line.text)) return false
+        view.dispatch({
+          changes: { from: line.from, to: line.to, insert: '' },
+          selection: { anchor: line.from },
+          userEvent: 'input',
+        })
+        return true
+      },
+    },
+  ]),
+)
 
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void; (e: 'save'): void }>()
@@ -23,7 +51,9 @@ const extensions: Extension[] = [
   markdown({ base: markdownLanguage, codeLanguages: [] }),
   syntaxHighlighting(defaultHighlightStyle),
   highlightActiveLine(),
+  blockStyleDecorator,
   inlineStyleDecorator,
+  exitEmptyListOnEnter,
   keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
   EditorView.lineWrapping,
   EditorView.updateListener.of((u) => {
@@ -32,7 +62,7 @@ const extensions: Extension[] = [
     }
   }),
   EditorView.theme({
-    '&': { fontSize: '14px' },
+    '&': { fontSize: '16px' },
     '.cm-content': { fontFamily: 'var(--font-mono)', padding: '0 14px' },
   }),
 ]
