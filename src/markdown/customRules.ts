@@ -6,13 +6,25 @@
 export interface CustomRule {
   id: string
   symbol: string
-  component: 'quote' | 'tip' | 'card' | 'banner' | 'highlight' | 'points' | 'html'
+  component:
+    | 'quote'
+    | 'tip'
+    | 'card'
+    | 'banner'
+    | 'highlight'
+    | 'points'
+    | 'heading'
+    | 'divider'
+    | 'warn'
+    | 'html'
   color?: string
   borderWidth?: number
   background?: string
   label?: string
   html?: string
   enabled: boolean
+  /** 内置规则：不显示在「我的规则」那排（避免挤爆），但仍参与渲染 */
+  hidden?: boolean
 }
 
 const RULE_RE = (symbol: string) =>
@@ -52,6 +64,18 @@ function tint(hex: string, alpha: number): string {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`
 }
 
+/** 根据底色深浅选可读的正文色（横幅换浅底时白字会看不见） */
+function readableOn(hex: string): string {
+  const h = (hex || '').replace('#', '')
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return '#F2EFE8'
+  const n = parseInt(full, 16)
+  const r = (n >> 16) & 255
+  const g = (n >> 8) & 255
+  const b = n & 255
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? '#1F1E1B' : '#F2EFE8'
+}
+
 function buildTemplate(rule: CustomRule, inner: string, rawText?: string): string {
   const color = rule.color || 'var(--md-primary-color)'
   const bw = rule.borderWidth ?? 4
@@ -63,9 +87,23 @@ function buildTemplate(rule: CustomRule, inner: string, rawText?: string): strin
       return `<section class="mf-custom mf-custom-tip" style="background:${bg};border:0.5px solid ${color};border-radius:8px;padding:12px 16px;margin:16px 0;"><p class="mf-custom-label" style="color:${color};font-size:12px;font-weight:500;letter-spacing:1px;margin:0 0 6px;">${rule.label || '提示'}</p><div class="mf-custom-body">${inner}</div></section>`
     case 'card':
       return `<section class="mf-custom mf-custom-card" style="background:${bg};border-radius:10px;padding:18px 20px;margin:18px 0;"><div class="mf-custom-body">${inner}</div></section>`
-    case 'banner':
-      // 深色横幅：暗底 + 顶部一条强调色线，正文反白，适合金句/章节分隔
-      return `<section class="mf-custom mf-custom-banner" style="background:${rule.background || '#221F1B'};border-top:4px solid ${color};border-radius:10px;padding:16px 18px;margin:18px 0;"><p class="mf-custom-label" style="color:${color};font-size:12px;font-weight:600;letter-spacing:1.5px;margin:0 0 6px;">${rule.label || 'BANNER'}</p><div class="mf-custom-body" style="color:#F2EFE8;">${inner}</div></section>`
+    case 'banner': {
+      // 深色横幅：底色可改（bg=），顶部一条强调线；正文字色按底色深浅自动反白
+      const base = rule.background || '#221F1B'
+      const fg = readableOn(base)
+      return `<section class="mf-custom mf-custom-banner" style="background:${base};border-top:4px solid ${color};border-radius:10px;padding:16px 18px;margin:18px 0;"><p class="mf-custom-label" style="color:${color};font-size:12px;font-weight:600;letter-spacing:1.5px;margin:0 0 6px;">${rule.label || 'BANNER'}</p><div class="mf-custom-body" style="color:${fg};">${inner}</div></section>`
+    }
+    case 'heading': {
+      // :::h1 / :::h2 / :::h3 —— 标题也能上色（普通 # 标题只跟主题走）
+      const level = Number((rule.symbol.match(/(\d)\s*$/) || [])[1]) || 2
+      const text = escapeHtml(rule.label || '标题')
+      const size = level === 1 ? '24px' : level === 2 ? '20px' : '18px'
+      return `<h${level} style="font-size:${size};font-weight:700;color:${color};line-height:1.45;margin:22px 0 10px;">${text}</h${level}>`
+    }
+    case 'divider':
+      return `<section class="mf-custom mf-custom-divider" style="height:0;border-top:2px solid ${color};margin:24px 0;font-size:0;line-height:0;">&nbsp;</section>`
+    case 'warn':
+      return `<section class="mf-custom mf-custom-warn" style="background:${bg};border-left:4px solid ${color};border-radius:0 8px 8px 0;padding:14px 16px;margin:16px 0;"><p style="color:${color};font-size:12px;font-weight:700;letter-spacing:1px;margin:0 0 6px;">${rule.label || '注意'}</p><div style="color:var(--md-text-secondary);">${inner}</div></section>`
     case 'points': {
       // 彩色编号要点：每行 `标题|补充说明`，编号与强调色一致
       const lines = (rawText || '').split('\n').map((s) => s.trim()).filter(Boolean)
@@ -203,4 +241,10 @@ export const DEFAULT_RULES: CustomRule[] = [
     label: '要点',
     enabled: true,
   },
+  /* 内置可着色块：服务「结构模板」，不占用「我的规则」那排 */
+  { id: 'r-h1', symbol: ':::h1', component: 'heading', label: '标题', enabled: true, hidden: true },
+  { id: 'r-h2', symbol: ':::h2', component: 'heading', label: '小标题', enabled: true, hidden: true },
+  { id: 'r-h3', symbol: ':::h3', component: 'heading', label: '子标题', enabled: true, hidden: true },
+  { id: 'r-hr', symbol: ':::hr', component: 'divider', enabled: true, hidden: true },
+  { id: 'r-warn', symbol: ':::warn', component: 'warn', label: '注意', enabled: true, hidden: true },
 ]

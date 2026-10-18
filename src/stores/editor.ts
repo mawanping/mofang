@@ -95,6 +95,18 @@ export const useEditorStore = defineStore('editor', () => {
     localStorage.setItem('mf-brush', c)
   }
 
+  /**
+   * 画笔底色：格式工具栏「底色」那一行选的颜色。
+   * 作为模板块的背景色写进块标记（:::banner 重点 #E8622C bg=#1A2B3C），
+   * 这样深色横幅这类块的底色也能单独换，而不是永远是黑的。
+   */
+  const brushBg = ref(localStorage.getItem('mf-brush-bg') || '')
+  function setBrushBg(c: string): void {
+    brushBg.value = c
+    if (c) localStorage.setItem('mf-brush-bg', c)
+    else localStorage.removeItem('mf-brush-bg')
+  }
+
   /* ---------- AI 配置 ---------- */
   const aiProvider = ref('pollinations')
   const aiApiKey = ref('')
@@ -269,7 +281,7 @@ export const useEditorStore = defineStore('editor', () => {
     saveState, lastSavedAt, wordCount, readMinutes,
     view, editorMode, previewMode, focusMode, leftPanel, leftCollapsed, toggleLeftPanel, aiPanelOpen, settingsOpen,
     customRules, aiProvider, aiApiKey, aiModel, aiPresets,
-    brushColor, setBrushColor,
+    brushColor, setBrushColor, brushBg, setBrushBg,
     wbTheme, setWbTheme,
     panelTheme, panelCustom, panelColors, setPanelTheme, setPanelCustom, switchMode,
     loadAll, openDoc, newDoc, markDirty, flushSave, removeDoc, saveRules, saveAiConfig,

@@ -9,7 +9,7 @@ import TopBar from '../components/TopBar.vue'
 import FormatToolbar from '../components/FormatToolbar.vue'
 import { TEMPLATE_BLOCKS } from '../markdown/templates'
 
-/** 模板模式：插入结构块（强调色用当前画笔色，写在块标记上） */
+/** 模板模式：插入结构块（强调色 + 底色都来自画笔，写在块标记上） */
 function insertTemplate(md: string): void {
   const c = store.brushColor || store.primaryColor || '#2F6B4F'
   const h = c.replace('#', '')
@@ -18,7 +18,13 @@ function insertTemplate(md: string): void {
   const soft = Number.isNaN(n)
     ? 'rgba(0,0,0,0.05)'
     : `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},0.08)`
-  editorRef.value?.insertAndSelect(md.replace(/\{\{c\}\}/g, c).replace(/\{\{soft\}\}/g, soft))
+  const bg = store.brushBg
+  const out = md
+    .replace(/\{\{c\}\}/g, c)
+    .replace(/\{\{soft\}\}/g, soft)
+    .replace(/\s*\{\{bg\}\}/g, bg ? ` bg=${bg}` : '')
+    .replace(/\{\{bg\}\}/g, bg)
+  editorRef.value?.insertAndSelect(out)
 }
 
 const store = useEditorStore()
