@@ -3,11 +3,14 @@ import { ref, computed, onMounted } from 'vue'
 import { useEditorStore } from '../stores/editor'
 import { listAssets, putAsset, deleteAsset, uid, type AssetRecord } from '../stores/db'
 import { COVER_SPECS, makeCover, type CoverRatio } from '../ai/cover'
+import { primeAssetCache, copyImageToClipboard, invalidateAssetCache } from '../utils/assets'
 
 const store = useEditorStore()
 const assets = ref<AssetRecord[]>([])
 const urls = ref<Map<string, string>>(new Map())
 const dragging = ref(false)
+/** 操作反馈（复制图片等） */
+const hint = ref('')
 
 /* ---------- 封面生成 ---------- */
 const showCover = ref(false)
@@ -35,6 +38,7 @@ async function onFiles(files: FileList | null) {
       createdAt: Date.now(),
     }
     await putAsset(a)
+    await primeAssetCache(a.id, f)
   }
   await load()
 }
@@ -52,6 +56,19 @@ function insertAtCursor(asset: AssetRecord) {
 
 function copyRef(a: AssetRecord) {
   navigator.clipboard.writeText(`![${a.name}](asset:${a.id})`)
+}
+
+/** 复制图片本体，可直接粘进公众号编辑器 */
+async function copyImage(a: AssetRecord) {
+  const ok = await copyImageToClipboard(a.blob)
+  hint.value = ok ? '图片已复制，去公众号 Ctrl+V' : '浏览器不支持写图片剪贴板'
+  window.setTimeout(() => (hint.value = ''), 2200)
+}
+
+async function removeAsset(id: string) {
+  await deleteAsset(id)
+  invalidateAssetCache(id)
+  await load()
 }
 
 function fmtSize(n: number): string {
@@ -136,12 +153,14 @@ onMounted(load)
     </div>
 
     <div class="mf-scroll flex-1 px-2.5 pb-3">
+      <p v-if="hint" class="text-[10.5px] text-mf-primary mb-1.5">{{ hint }}</p>
       <div v-for="a in assets" :key="a.id" class="group relative mb-2">
         <img :src="urls.get(a.id)" class="w-full h-20 object-cover rounded-md border border-mf-line" :alt="a.name" />
-        <div class="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity rounded-md flex items-center justify-center gap-1.5">
-          <button class="px-1.5 py-0.5 rounded bg-white text-[10px] text-mf-ink" @click="insertAtCursor(a)">插入</button>
-          <button class="px-1.5 py-0.5 rounded bg-white text-[10px] text-mf-ink" @click="copyRef(a)">复制引用</button>
-          <button class="px-1.5 py-0.5 rounded bg-white text-[10px] text-red-600" @click="deleteAsset(a.id).then(load)">删</button>
+        <div class="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity rounded-md flex items-center justify-center gap-1 flex-wrap px-1">
+          <button class="px-1.5 py-0.5 rounded bg-white text-[10px] text-mf-ink" title="插入到光标处" @click="insertAtCursor(a)">插入</button>
+          <button class="px-1.5 py-0.5 rounded bg-white text-[10px] text-mf-ink" title="复制图片本体，可粘进公众号" @click="copyImage(a)">复制图</button>
+          <button class="px-1.5 py-0.5 rounded bg-white text-[10px] text-mf-ink" title="复制 Markdown 引用" @click="copyRef(a)">引用</button>
+          <button class="px-1.5 py-0.5 rounded bg-white text-[10px] text-red-600" @click="removeAsset(a.id)">删</button>
         </div>
         <p class="text-[10px] text-mf-ink-4 mt-0.5 truncate">{{ a.name }} · {{ fmtSize(a.size) }}</p>
       </div>

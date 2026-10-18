@@ -7,8 +7,45 @@
  * - 标记后面的正文按层级换字号/字重/字体，视觉上 ≈ 稿子已经排好版；
  * - 只处理 viewport 内的行，长文不卡。
  */
-import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view'
-import type { Range } from '@codemirror/state'
+import {
+  Decoration,
+  EditorView,
+  ViewPlugin,
+  WidgetType,
+  type DecorationSet,
+  type ViewUpdate,
+} from '@codemirror/view'
+import { StateEffect, type Range } from '@codemirror/state'
+import { getCachedDataUrl } from '../utils/assets'
+
+/** 素材图片异步就绪后，通知装饰器重建 */
+export const refreshAssetImages = StateEffect.define<null>()
+
+/** 编辑区内的图片预览：把 ![alt](asset:id) 换成一个 img */
+class AssetImageWidget extends WidgetType {
+  constructor(
+    readonly url: string,
+    readonly alt: string,
+  ) {
+    super()
+  }
+  eq(o: AssetImageWidget): boolean {
+    return o.url === this.url && o.alt === this.alt
+  }
+  toDOM(): HTMLElement {
+    const wrap = document.createElement('span')
+    wrap.className = 'cm-mf-img'
+    const img = document.createElement('img')
+    img.src = this.url
+    img.alt = this.alt
+    img.loading = 'lazy'
+    wrap.appendChild(img)
+    return wrap
+  }
+  ignoreEvent(): boolean {
+    return false
+  }
+}
 
 const lineDeco = (cls: string, style?: string) =>
   Decoration.line(style ? { class: cls, attributes: { style } } : { class: cls })
@@ -39,6 +76,23 @@ const RE_INLINE =
   /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(==[^=\n]+==)|(\+\+[^+\n]+\+\+)|(~~[^~\n]+~~)|(\^[^^\n]+\^)|(\*[^*\n]+\*)/g
 
 function inlineDecos(text: string, offset: number, out: Range<Decoration>[]): void {
+  /* 图片引用优先：![alt](asset:id) → 直接显示缩略图 */
+  const RE_IMG = /!\[([^\]]*)\]\(asset:([^)\s]+)\)/g
+  for (const m of text.matchAll(RE_IMG)) {
+    const start = offset + m.index
+    const url = getCachedDataUrl(m[2])
+    if (url) {
+      out.push(
+        Decoration.replace({
+          widget: new AssetImageWidget(url, m[1] || '配图'),
+        }).range(start, start + m[0].length),
+      )
+    } else {
+      // 图还在加载：先给个占位提示
+      out.push(markDeco('cm-mf-img-pending').range(start, start + m[0].length))
+    }
+  }
+
   RE_INLINE.lastIndex = 0
   let m: RegExpExecArray | null
   while ((m = RE_INLINE.exec(text))) {
@@ -167,7 +221,8 @@ class BlockStylePlugin {
     this.decorations = build(view)
   }
   update(u: ViewUpdate) {
-    if (u.docChanged || u.viewportChanged) {
+    const forced = u.transactions.some((t) => t.effects.some((e) => e.is(refreshAssetImages)))
+    if (u.docChanged || u.viewportChanged || forced) {
       this.decorations = build(u.view)
     }
   }

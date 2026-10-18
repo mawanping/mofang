@@ -6,7 +6,8 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput } from '@codemirror/language'
 import { inlineStyleDecorator } from './inlineDecorator'
-import { blockStyleDecorator } from './blockDecorator'
+import { blockStyleDecorator, refreshAssetImages } from './blockDecorator'
+import { assetIdsIn, assetToDataUrl, getCachedDataUrl } from '../utils/assets'
 
 /**
  * 空列表项按回车 → 跳出列表（清掉 `- ` / `1. ` 标记）。
@@ -42,6 +43,22 @@ const host = ref<HTMLDivElement>()
 const view = shallowRef<EditorView>()
 let updating = false
 
+/**
+ * 把正文里出现的素材图片读进缓存，让编辑区能直接显示图片本身。
+ * 装饰器是同步的，所以先异步预热，就绪后 dispatch 一个 effect 触发重建。
+ */
+async function primeImages(ctx: { state: EditorState; view: EditorView }): Promise<void> {
+  const ids = assetIdsIn(ctx.state.doc.toString()).filter((id) => !getCachedDataUrl(id))
+  if (!ids.length) return
+  const loaded = await Promise.all(ids.map((id) => assetToDataUrl(id).catch(() => null)))
+  if (!loaded.some(Boolean)) return
+  try {
+    ctx.view.dispatch({ effects: refreshAssetImages.of(null) })
+  } catch {
+    /* 编辑器已销毁 */
+  }
+}
+
 const extensions: Extension[] = [
   lineNumbers(),
   highlightActiveLineGutter(),
@@ -59,6 +76,7 @@ const extensions: Extension[] = [
   EditorView.updateListener.of((u) => {
     if (u.docChanged && !updating) {
       emit('update:modelValue', u.state.doc.toString())
+      void primeImages(u)
     }
   }),
   EditorView.theme({
@@ -74,6 +92,8 @@ onMounted(() => {
     extensions,
   })
   view.value = new EditorView({ state, parent: host.value })
+  // 已有正文里的图片也要能显示
+  void primeImages({ state: view.value.state, view: view.value })
 })
 
 onBeforeUnmount(() => view.value?.destroy())

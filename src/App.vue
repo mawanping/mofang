@@ -4,7 +4,6 @@ import { useEditorStore } from './stores/editor'
 import WriteView from './views/WriteView.vue'
 import BoardView from './views/BoardView.vue'
 import StatsView from './views/StatsView.vue'
-import CoverView from './views/CoverView.vue'
 import AiImagePanel from './components/AiImagePanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 
@@ -13,7 +12,6 @@ const store = useEditorStore()
 const nav = [
   { key: 'write', label: '写作', icon: '✎' },
   { key: 'board', label: '看板', icon: '▦' },
-  { key: 'cover', label: '封面', icon: '▣' },
   { key: 'stats', label: '统计', icon: '▤' },
 ] as const
 
@@ -72,8 +70,8 @@ onMounted(async () => {
     <div class="flex-1 min-w-0">
       <WriteView v-if="store.view === 'write'" />
       <BoardView v-else-if="store.view === 'board'" />
-      <CoverView v-else-if="store.view === 'cover'" />
       <StatsView v-else-if="store.view === 'stats'" />
+      <WriteView v-else />
     </div>
 
     <AiImagePanel v-if="store.aiPanelOpen" />

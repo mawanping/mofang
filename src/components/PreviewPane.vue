@@ -6,8 +6,8 @@ import { inlineForWechat } from '../markdown/wechat'
 import { hydrateMermaid } from '../markdown/extensions/mermaid'
 import { hydratePlantuml } from '../markdown/extensions/plantuml'
 import type { CustomRule } from '../markdown/customRules'
-import { getTheme, composeThemeCSS } from '../themes'
-import { listAssets, type AssetRecord } from '../stores/db'
+import { composeThemeCSS } from '../themes'
+import { resolveAssetRefs } from '../utils/assets'
 
 const props = defineProps<{
   content: string
@@ -24,7 +24,6 @@ const props = defineProps<{
 
 const output = ref<HTMLDivElement>()
 const wechatHtml = ref('')
-const assets = ref<Map<string, AssetRecord>>(new Map())
 const themeStyleEl = ref<HTMLStyleElement>()
 
 /** 桌面端预览：390px 手机宽 ↔ 全宽桌面，持久化 */
@@ -38,23 +37,12 @@ const clean = computed(() =>
   }),
 )
 
-async function loadAssets() {
-  const list = await listAssets()
-  assets.value = new Map(list.map((a) => [a.id, a]))
-}
-
 async function build() {
-  const { html: raw } = renderMarkdown(props.content, props.customRules)
-  // 展开 asset: 引用为 data URL
-  let expanded = raw
-  if (assets.value.size) {
-    expanded = expanded.replace(/!\[([^\]]*)\]\(asset:([^)]+)\)/g, (_m, alt, id) => {
-      const a = assets.value.get(id.trim())
-      if (!a) return `![${alt}]()`
-      const url = URL.createObjectURL(a.blob)
-      return `<img src="${url}" alt="${alt}" />`
-    })
-  }
+  // 关键：在渲染「之前」把 ![alt](asset:id) 解析成 data URI。
+  // 渲染后再拿 Markdown 正则去匹配 HTML 是匹配不到的，图片会一直是空 src。
+  const resolved = await resolveAssetRefs(props.content)
+  const { html: raw } = renderMarkdown(resolved, props.customRules)
+  const expanded = raw
 
   // 注入主题 CSS：内联化在离屏 stage 上进行，head 里的主题样式对其生效
   const css = composeThemeCSS(props.themeId, props.primaryColor)
@@ -94,7 +82,6 @@ watch(
 )
 
 onMounted(async () => {
-  await loadAssets()
   await build()
   await nextTick()
 })

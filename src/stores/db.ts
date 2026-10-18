@@ -96,6 +96,11 @@ export async function listAssets(): Promise<AssetRecord[]> {
   return all.sort((a, b) => b.createdAt - a.createdAt)
 }
 
+export async function getAsset(id: string): Promise<AssetRecord | undefined> {
+  const db = await getDB()
+  return (await db.get('assets', id)) as AssetRecord | undefined
+}
+
 export async function putAsset(a: AssetRecord): Promise<void> {
   const db = await getDB()
   await db.put('assets', a)

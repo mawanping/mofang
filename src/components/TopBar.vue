@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useEditorStore, PANEL_PRESETS } from '../stores/editor'
 import { copyHtmlToClipboard, inlineForWechat } from '../markdown/wechat'
 import { saveToFolder, exportHtml, exportPdf, dirSupported } from '../utils/exporters'
+import { ensureInlineImages } from '../utils/assets'
 
 const store = useEditorStore()
 const toast = ref('')
@@ -23,9 +24,17 @@ async function onCopy() {
   await store.flushSave()
   const el = document.querySelector('#output')
   if (!el) return
+  // 最后一道保险：blob: / asset: 图片先转 data URI，否则粘进公众号是空白
+  const fixed = await ensureInlineImages(el as HTMLElement)
   const inline = inlineForWechat(el as HTMLElement)
   const ok = await copyHtmlToClipboard(inline)
-  flash(ok ? '已复制，去公众号后台 Ctrl+V 粘贴' : '复制失败，请用下方「导出 HTML」手动复制')
+  if (!ok) {
+    flash('复制失败，请用「导出 HTML」手动复制')
+    return
+  }
+  const imgs = (inline.match(/<img/gi) || []).length
+  if (!imgs) flash('已复制，去公众号后台 Ctrl+V 粘贴')
+  else flash(`已复制 ${imgs} 张图${fixed ? `（转换 ${fixed} 张）` : ''}，粘贴后若图片空白请用配图面板的「复制图片」`)
 }
 
 async function onSaveMd() {

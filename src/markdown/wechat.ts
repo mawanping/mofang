@@ -190,9 +190,22 @@ export function inlineForWechat(root: HTMLElement, opts: { keepClass?: boolean }
       const cleaned = s
         .replace(/(?:^|;)\s*(?:max-|min-)?width:\s*[0-9.]+px\s*(?=;|$)/gi, '')
         .replace(/;\s*;$/, '')
-        .replace(/^;|;$/, '')
+        .replace(/^;|;$/g, '')
       if (cleaned.trim()) n.setAttribute('style', cleaned)
       else n.removeAttribute('style')
+    }
+    // 图片：公众号里必须自适应容器宽度，否则 data URI 的原始像素会撑爆排版
+    if (n.tagName === 'IMG') {
+      n.removeAttribute('width')
+      n.removeAttribute('height')
+      let st = n.getAttribute('style') || ''
+      st = st
+        .replace(/(?:^|;)\s*(?:max-|min-)?(?:width|height):\s*[0-9.]+px\s*(?=;|$)/gi, '')
+        .replace(/^;+|;+$/g, '')
+      n.setAttribute(
+        'style',
+        `${st ? `${st};` : ''}max-width:100%;height:auto;display:block;border-radius:4px;margin:12px auto`,
+      )
     }
   })
   return out.innerHTML

@@ -1,6 +1,7 @@
 import { useEditorStore } from '../stores/editor'
 import { generateImage, RATIOS } from './providers'
 import { putAsset, uid, type AssetRecord } from '../stores/db'
+import { primeAssetCache } from '../utils/assets'
 
 export type CoverRatio = 'big' | 'square'
 
@@ -55,6 +56,7 @@ export async function saveCoverToAssets(url: string, ratio: CoverRatio): Promise
     createdAt: Date.now(),
   }
   await putAsset(rec)
+  await primeAssetCache(id, blob)
   return rec
 }
 

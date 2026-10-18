@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useEditorStore } from '../stores/editor'
 import { PROVIDERS, RATIOS, DEFAULT_PRESETS, applyTemplate, generateImage } from '../ai/providers'
 import { putAsset, uid, type AssetRecord } from '../stores/db'
+import { primeAssetCache, copyImageToClipboard } from '../utils/assets'
 
 const store = useEditorStore()
 
@@ -12,8 +13,17 @@ const ratio = ref('1:1')
 const count = ref(2)
 const busy = ref(false)
 const err = ref('')
+const tip = ref('')
 const results = ref<{ url: string; provider: string }[]>([])
-const localUrls = ref<Map<string, string>>(new Map())
+const lightbox = ref<string>('')
+const pending = ref<number>(-1)
+
+function flash(msg: string) {
+  tip.value = msg
+  window.setTimeout(() => {
+    if (tip.value === msg) tip.value = ''
+  }, 2200)
+}
 
 const providerOptions = computed(() =>
   PROVIDERS.map((p) => ({ id: p.id, name: p.name, needsKey: p.needsKey, free: p.free })),
@@ -56,10 +66,18 @@ async function generate() {
   busy.value = false
 }
 
-async function useImage(r: { url: string }) {
+async function fetchBlob(r: { url: string }): Promise<Blob> {
+  const res = await fetch(r.url)
+  if (!res.ok) throw new Error(`图片下载失败 HTTP ${res.status}`)
+  return res.blob()
+}
+
+/** 插入文章：先入库，再把 asset 引用写进正文（预览会在渲染前解析成真实图片） */
+async function useImage(r: { url: string }, index = -1) {
+  if (pending.value !== -1) return
+  pending.value = index
   try {
-    const res = await fetch(r.url)
-    const blob = await res.blob()
+    const blob = await fetchBlob(r)
     const id = uid()
     const a: AssetRecord = {
       id,
@@ -70,12 +88,39 @@ async function useImage(r: { url: string }) {
       createdAt: Date.now(),
     }
     await putAsset(a)
-    localUrls.value.set(id, URL.createObjectURL(blob))
+    // 预热缓存，插入后立刻能渲染出来
+    await primeAssetCache(id, blob)
     const editor = (window as unknown as { __mfEditor?: { insert: (t: string) => void } }).__mfEditor
     editor?.insert(`\n![AI 配图](asset:${id})\n`)
     store.aiPanelOpen = false
-  } catch {
-    err.value = '图片保存失败，请重试'
+  } catch (e) {
+    err.value = (e as Error).message || '图片保存失败，请重试'
+  } finally {
+    pending.value = -1
+  }
+}
+
+/** 复制图片本体到剪贴板，可直接在公众号编辑器 Ctrl+V */
+async function copyImage(r: { url: string }) {
+  try {
+    const blob = await fetchBlob(r)
+    const ok = await copyImageToClipboard(blob)
+    flash(ok ? '图片已复制，去公众号编辑器 Ctrl+V' : '复制失败：浏览器不支持写图片剪贴板')
+  } catch (e) {
+    flash((e as Error).message || '复制失败')
+  }
+}
+
+/** 存入素材库（不插入正文） */
+async function saveToAssets(r: { url: string }) {
+  try {
+    const blob = await fetchBlob(r)
+    const id = uid()
+    await putAsset({ id, name: `ai-${id}.png`, blob, type: blob.type || 'image/png', size: blob.size, createdAt: Date.now() })
+    await primeAssetCache(id, blob)
+    flash('已存入素材库')
+  } catch (e) {
+    flash((e as Error).message || '保存失败')
   }
 }
 
@@ -155,15 +200,33 @@ function saveConfig() {
       >{{ busy ? '生成中…' : '生成' }}</button>
 
       <p v-if="err" class="text-[11px] text-red-600 leading-snug">{{ err }}</p>
+      <p v-if="tip" class="text-[11px] text-mf-primary leading-snug">{{ tip }}</p>
 
       <div v-if="results.length" class="space-y-2">
-        <p class="text-[11px] text-mf-ink-3">生成结果（点图即插入光标处）</p>
-        <div v-for="(r, i) in results" :key="i" class="group relative rounded-md overflow-hidden border border-mf-line">
-          <img :src="r.url" class="w-full block" />
-          <button
-            class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[12px]"
-            @click="useImage(r)"
-          >点击插入文章</button>
+        <p class="text-[11px] text-mf-ink-3">生成结果（点图看大图，按钮分别为插入/复制/入库）</p>
+        <div v-for="(r, i) in results" :key="i" class="rounded-md overflow-hidden border border-mf-line bg-mf-app">
+          <img
+            :src="r.url"
+            class="w-full block cursor-zoom-in"
+            title="点击查看大图"
+            @click="lightbox = r.url"
+          />
+          <div class="flex items-center gap-1 p-1.5">
+            <button
+              class="flex-1 py-1 rounded text-[11px] bg-mf-primary text-white disabled:opacity-50"
+              :disabled="pending !== -1"
+              @click="useImage(r, i)"
+            >{{ pending === i ? '插入中…' : '插入文章' }}</button>
+            <button
+              class="flex-1 py-1 rounded text-[11px] border border-mf-line-2 text-mf-ink-2 hover:border-mf-primary hover:text-mf-primary"
+              @click="copyImage(r)"
+            >复制图片</button>
+            <button
+              class="py-1 px-1.5 rounded text-[11px] border border-mf-line-2 text-mf-ink-3 hover:border-mf-primary hover:text-mf-primary"
+              title="存入素材库"
+              @click="saveToAssets(r)"
+            >存库</button>
+          </div>
         </div>
       </div>
 
@@ -171,6 +234,15 @@ function saveConfig() {
         免费通道（Pollinations）无需配置，直接点「生成」即可出图。<br />
         需要更高质量或特定风格时，在右上角「设置」里切换渠道并填入自己的 API Key。
       </div>
+    </div>
+
+    <!-- 大图预览（点击遮罩关闭） -->
+    <div
+      v-if="lightbox"
+      class="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-6 cursor-zoom-out"
+      @click="lightbox = ''"
+    >
+      <img :src="lightbox" class="max-w-full max-h-full rounded-lg shadow-2xl" />
     </div>
   </div>
 </template>
