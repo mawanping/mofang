@@ -1,6 +1,10 @@
 /**
  * 公众号结构模板：模板模式下以快捷按钮形式一键插入，
  * 解决「模板模式到底有什么用」的问题。
+ *
+ * `{{c}}` = 当前画笔色，`{{soft}}` = 该色的淡底，插入时由 WriteView 替换。
+ * 颜色写在块标记上（:::points 要点 #E8622C），而不是选中文字包 span ——
+ * 包 span 会打断 `1.` 这类行首语法，导致版式直接失效。
  */
 
 export interface TemplateBlock {
@@ -22,7 +26,7 @@ export const TEMPLATE_BLOCKS: TemplateBlock[] = [
     id: 'lead',
     name: '开篇导语',
     desc: '摘要式开场，读者一眼看到价值',
-    md: '\n**开篇：** 用两三句话说清「这篇讲什么、你能拿走什么」。\n\n',
+    md: '\n:::tip 开篇 {{c}}\n用两三句话说清「这篇讲什么、你能拿走什么」。\n:::\n\n',
   },
   {
     id: 'section',
@@ -33,8 +37,8 @@ export const TEMPLATE_BLOCKS: TemplateBlock[] = [
   {
     id: 'quote',
     name: '金句引用',
-    desc: '突出观点的引用块',
-    md: '\n> [!NOTE]\n> 值得被记住的一句话。\n\n',
+    desc: '突出观点的引用块（可换色）',
+    md: '\n:::quote 记一句 {{c}}\n值得被记住的一句话。\n:::\n\n',
   },
   {
     id: 'image',
@@ -45,14 +49,14 @@ export const TEMPLATE_BLOCKS: TemplateBlock[] = [
   {
     id: 'list',
     name: '要点列表',
-    desc: '有序要点，适合罗列方法',
-    md: '\n1. 第一点\n2. 第二点\n3. 第三点\n\n',
+    desc: '彩色编号要点，强调色跟随画笔色',
+    md: '\n:::points 要点 {{c}}\n第一点|一句话补充说明\n第二点\n第三点\n:::\n\n',
   },
   {
     id: 'points',
     name: '卡片清单',
-    desc: '自定义样式清单（可勾选）',
-    md: '\n- [ ] 待办项一\n- [ ] 待办项二\n\n',
+    desc: '主题卡片包裹的清单（可换底色）',
+    md: '\n:::card bg={{soft}}\n- 第一项\n- 第二项\n- 第三项\n:::\n\n',
   },
   {
     id: 'divider',
@@ -77,6 +81,12 @@ export const TEMPLATE_BLOCKS: TemplateBlock[] = [
     name: '提示卡片',
     desc: 'WARNING 警示块',
     md: '\n> [!WARNING]\n> 需要注意的地方。\n\n',
+  },
+  {
+    id: 'banner',
+    name: '深色横幅',
+    desc: '暗底反白金句，顶部强调线可换色',
+    md: '\n:::banner 金句 {{c}}\n这里是需要在深色底上强调的一句话。\n:::\n\n',
   },
   {
     id: 'ending',

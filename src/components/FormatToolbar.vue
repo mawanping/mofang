@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useEditorStore } from '../stores/editor'
 
 const props = defineProps<{ open: boolean }>()
@@ -12,12 +12,15 @@ const emit = defineEmits<{
 
 const store = useEditorStore()
 
-/* 区块格式：一键插入完整语法，占位文字自动选中 */
+/* 区块格式：一键插入完整语法，占位文字自动选中。
+   强调色由「当前画笔色」决定，写在块标记后面 —— 换色不会破坏版式。
+   注意：每个块都以换行开头，否则紧跟上一块的 `:::` 会拼成 `::::::banner` 导致语法失效。 */
 const BLOCKS: { name: string; text: string; select: string }[] = [
-  { name: '彩色引用', text: ':::quote 小标题\n正文写在这里\n:::', select: '正文写在这里' },
-  { name: '提示条', text: ':::tip 小提示\n正文写在这里\n:::', select: '正文写在这里' },
-  { name: '主题卡', text: ':::card\n正文写在这里\n:::', select: '正文写在这里' },
-  { name: '深色横幅', text: ':::banner 重点\n正文写在这里\n:::', select: '正文写在这里' },
+  { name: '彩色引用', text: '\n:::quote 小标题 {{c}}\n正文写在这里\n:::\n', select: '正文写在这里' },
+  { name: '提示条', text: '\n:::tip 小提示 {{c}}\n正文写在这里\n:::\n', select: '正文写在这里' },
+  { name: '主题卡', text: '\n:::card bg={{soft}}\n正文写在这里\n:::\n', select: '正文写在这里' },
+  { name: '深色横幅', text: '\n:::banner 重点 {{c}}\n正文写在这里\n:::\n', select: '正文写在这里' },
+  { name: '要点列表', text: '\n:::points 要点 {{c}}\n第一点|补充说明\n第二点\n第三点\n:::\n', select: '第一点' },
 ]
 
 /* 行内色板与字号档位 */
@@ -27,8 +30,42 @@ const SIZES = [12, 14, 16, 18, 20, 22, 24, 28]
 
 const activeRules = computed(() => store.customRules.filter((r) => r.enabled))
 
+/** 把 hex 压成 6% 透明度的淡底，给 card/points 用（公众号不认 color-mix） */
+function softOf(hex: string): string {
+  const h = hex.replace('#', '')
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h
+  const n = parseInt(full.slice(0, 6), 16)
+  if (Number.isNaN(n)) return 'rgba(0,0,0,0.04)'
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},0.08)`
+}
+
+/** 用当前画笔色填充块语法 */
+function fill(template: string): string {
+  const c = store.brushColor
+  return template.replace(/\{\{c\}\}/g, c).replace(/\{\{soft\}\}/g, softOf(c))
+}
+
+function insertBlock(b: { text: string; select: string }) {
+  emit('block', fill(b.text), b.select)
+}
+
+function insertRule(r: { symbol: string; label?: string; component: string }) {
+  const head = r.label && r.component !== 'card' && r.component !== 'quote' ? ` ${r.label}` : ''
+  emit('block', fill(`\n${r.symbol}${head} {{c}}\n正文写在这里\n:::\n`), '正文写在这里')
+}
+
+const colorTip = ref('')
+function flashColorTip(msg: string) {
+  colorTip.value = msg
+  window.setTimeout(() => {
+    if (colorTip.value === msg) colorTip.value = ''
+  }, 2000)
+}
+
 function applyColor(c: string) {
+  store.setBrushColor(c)
   emit('inline', `color:${c}`)
+  flashColorTip(`画笔色已设为 ${c}`)
 }
 function applyBg(c: string) {
   emit('inline', c === '#221F1B' ? `background:${c};color:#F2EFE8` : `background:${c}`)
@@ -44,7 +81,8 @@ function applyBg(c: string) {
         v-for="b in BLOCKS"
         :key="b.name"
         class="px-2 py-0.5 rounded border border-mf-line text-[11px] text-mf-ink-2 hover:border-mf-primary hover:text-mf-primary transition-colors"
-        @click="emit('block', b.text, b.select)"
+        :title="`插入${b.name}（强调色用当前画笔色 ${store.brushColor}）`"
+        @click="insertBlock(b)"
       >{{ b.name }}</button>
       <div class="flex-1"></div>
       <button
@@ -64,15 +102,19 @@ function applyBg(c: string) {
         <button
           v-for="c in COLORS"
           :key="c"
-          class="w-4 h-4 rounded border border-black/10 hover:scale-110 transition-transform"
+          class="w-4 h-4 rounded border hover:scale-110 transition-transform"
+          :class="store.brushColor?.toLowerCase() === c.toLowerCase() ? 'border-mf-primary ring-1 ring-mf-primary ring-offset-1' : 'border-black/10'"
           :style="{ background: c }"
-          :title="`字色 ${c}`"
+          :title="`字色 ${c}（同时设为模板块强调色）`"
           @click="applyColor(c)"
         ></button>
-        <label class="w-4 h-4 rounded border border-dashed border-mf-ink-4 cursor-pointer flex items-center justify-center text-[8px] text-mf-ink-4 hover:border-mf-primary hover:text-mf-primary transition-colors" title="自定义字色">
+        <label class="w-4 h-4 rounded border border-dashed border-mf-ink-4 cursor-pointer flex items-center justify-center text-[8px] text-mf-ink-4 hover:border-mf-primary hover:text-mf-primary transition-colors" title="自定义字色（同时作为模板块强调色）">
           ＋<input type="color" class="w-0 h-0 opacity-0 absolute" @input="applyColor(($event.target as HTMLInputElement).value)" />
         </label>
-        <span class="text-[10px] text-mf-ink-4 ml-1">选中文字后点色块即可上色</span>
+        <span class="text-[10px] text-mf-ink-4 ml-1" :class="colorTip ? 'text-mf-primary' : ''">
+          <template v-if="colorTip">{{ colorTip }} · 插入模板块时生效</template>
+          <template v-else>选中文字上色；不选则只存为画笔色 <b class="font-mono text-mf-ink-3">{{ store.brushColor }}</b>，插入模板块时使用</template>
+        </span>
       </div>
 
       <div class="h-7 flex items-center gap-1.5 px-2 border-t border-mf-line/60">
@@ -113,7 +155,8 @@ function applyBg(c: string) {
             v-for="r in activeRules"
             :key="r.id"
             class="px-2 py-0.5 rounded border border-mf-line font-mono text-[10.5px] text-mf-ink-2 hover:border-mf-primary hover:text-mf-primary transition-colors"
-            @click="emit('block', `${r.symbol}${r.label && r.component === 'tip' ? ' ' + r.label : ''}\n正文写在这里\n:::`, '正文写在这里')"
+            :title="`插入 ${r.symbol}（强调色用当前画笔色）`"
+            @click="insertRule(r)"
           >{{ r.symbol }}</button>
         </template>
         <span v-else class="text-[10px] text-mf-ink-4">暂无启用的规则，去设置里添加</span>

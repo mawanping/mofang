@@ -9,9 +9,16 @@ import TopBar from '../components/TopBar.vue'
 import FormatToolbar from '../components/FormatToolbar.vue'
 import { TEMPLATE_BLOCKS } from '../markdown/templates'
 
-/** 模板模式：插入结构块 */
+/** 模板模式：插入结构块（强调色用当前画笔色，写在块标记上） */
 function insertTemplate(md: string): void {
-  editorRef.value?.insertAndSelect(md)
+  const c = store.brushColor || store.primaryColor || '#2F6B4F'
+  const h = c.replace('#', '')
+  const full = h.length === 3 ? h.split('').map((x) => x + x).join('') : h
+  const n = parseInt(full.slice(0, 6), 16)
+  const soft = Number.isNaN(n)
+    ? 'rgba(0,0,0,0.05)'
+    : `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},0.08)`
+  editorRef.value?.insertAndSelect(md.replace(/\{\{c\}\}/g, c).replace(/\{\{soft\}\}/g, soft))
 }
 
 const store = useEditorStore()
@@ -101,15 +108,22 @@ function onFormatBlock(text: string, selectText?: string) {
   editorRef.value?.insertAndSelect(text, selectText)
 }
 
+/**
+ * 行内上色/字号。三条保护：
+ * 1. 没有选中文字 → 什么都不做（画笔色已由工具栏写入 store），
+ *    否则会往正文塞一个空 `<span style="color:...">文字</span>`，
+ *    后续插入的模板块被裹进这个 span 里，整块退化成行内内容、版式全丢。
+ * 2. 选区在 `:::xxx` 块内 → 不上色，避免打断块内的列表/标题语法。
+ * 3. 选区本身带块级标记（`#`、`-`、`1.`、`:::`、换行）→ 不上色。
+ */
 function onFormatInline(style: string) {
   const ed = editorRef.value
   if (!ed) return
   const sel = ed.getSelected()
-  if (sel) {
-    ed.insertAndSelect(`<span style="${style}">${sel}</span>`)
-  } else {
-    ed.insertAndSelect(`<span style="${style}">文字</span>`, '文字')
-  }
+  if (!sel) return
+  if (ed.selectionInCustomBlock?.()) return
+  if (/(?:\r?\n)|:::|^\s*(?:#{1,6}\s|[-*+]\s|\d{1,3}[.)]\s)/.test(sel)) return
+  ed.insertAndSelect(`<span style="${style}">${sel}</span>`)
 }
 
 function onFormatReset() {

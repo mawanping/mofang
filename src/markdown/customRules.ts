@@ -6,7 +6,7 @@
 export interface CustomRule {
   id: string
   symbol: string
-  component: 'quote' | 'tip' | 'card' | 'banner' | 'highlight' | 'html'
+  component: 'quote' | 'tip' | 'card' | 'banner' | 'highlight' | 'points' | 'html'
   color?: string
   borderWidth?: number
   background?: string
@@ -22,7 +22,37 @@ function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function buildTemplate(rule: CustomRule, inner: string): string {
+/**
+ * 首行头部解析，支持在标题后面追加单块配色：
+ *   `:::banner 重点 #E8622C`        → 强调色
+ *   `:::points 要点 #E8622C bg=#FFF7ED` → 强调色 + 底色
+ * 这样颜色写在块标记上，而不是包在文字上 —— 包 span 会打断 Markdown 列表/标题语法。
+ */
+function parseHead(raw: string): { label: string; color?: string; bg?: string } {
+  let label = (raw || '').trim()
+  let color: string | undefined
+  let bg: string | undefined
+  label = label.replace(/\s*\bbg=(#[0-9a-fA-F]{3,8})\s*/g, (_m, c: string) => {
+    bg = c
+    return ' '
+  })
+  label = label.replace(/\s*(#[0-9a-fA-F]{3,8})\s*$/, (_m, c: string) => {
+    color = c
+    return ''
+  })
+  return { label: label.trim(), color, bg }
+}
+
+/** hex → rgba，用于生成淡底（公众号不认 color-mix） */
+function tint(hex: string, alpha: number): string {
+  const h = hex.replace('#', '')
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h
+  const n = parseInt(full.slice(0, 6), 16)
+  if (Number.isNaN(n)) return `rgba(0,0,0,${alpha})`
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`
+}
+
+function buildTemplate(rule: CustomRule, inner: string, rawText?: string): string {
   const color = rule.color || 'var(--md-primary-color)'
   const bw = rule.borderWidth ?? 4
   const bg = rule.background || 'color-mix(in srgb, var(--md-primary-color) 8%, transparent)'
@@ -34,8 +64,21 @@ function buildTemplate(rule: CustomRule, inner: string): string {
     case 'card':
       return `<section class="mf-custom mf-custom-card" style="background:${bg};border-radius:10px;padding:18px 20px;margin:18px 0;"><div class="mf-custom-body">${inner}</div></section>`
     case 'banner':
-      // 深色横幅：暗底 + 顶部一条主色线，正文反白，适合金句/章节分隔
-      return `<section class="mf-custom mf-custom-banner" style="background:#221F1B;border-top:4px solid ${color};border-radius:10px;padding:16px 18px;margin:18px 0;"><p class="mf-custom-label" style="color:${color};font-size:12px;font-weight:600;letter-spacing:1.5px;margin:0 0 6px;">${rule.label || 'BANNER'}</p><div class="mf-custom-body" style="color:#F2EFE8;">${inner}</div></section>`
+      // 深色横幅：暗底 + 顶部一条强调色线，正文反白，适合金句/章节分隔
+      return `<section class="mf-custom mf-custom-banner" style="background:${rule.background || '#221F1B'};border-top:4px solid ${color};border-radius:10px;padding:16px 18px;margin:18px 0;"><p class="mf-custom-label" style="color:${color};font-size:12px;font-weight:600;letter-spacing:1.5px;margin:0 0 6px;">${rule.label || 'BANNER'}</p><div class="mf-custom-body" style="color:#F2EFE8;">${inner}</div></section>`
+    case 'points': {
+      // 彩色编号要点：每行 `标题|补充说明`，编号与强调色一致
+      const lines = (rawText || '').split('\n').map((s) => s.trim()).filter(Boolean)
+      const soft = rule.background || (rule.color ? tint(rule.color, 0.07) : 'rgba(0,0,0,0.03)')
+      const rows = lines
+        .map((line, i) => {
+          const [title, desc] = line.split('|')
+          const num = String(i + 1).padStart(2, '0')
+          return `<section style="display:flex;align-items:flex-start;gap:10px;margin:0 0 10px;line-height:1.6;"><span style="color:${color};font-size:15px;font-weight:700;letter-spacing:0.5px;min-width:24px;">${num}</span><span style="flex:1;color:var(--md-text-primary);">${escapeHtml(title.trim())}${desc ? `<br><span style="font-size:13px;color:var(--md-text-tertiary);">${escapeHtml(desc.trim())}</span>` : ''}</span></section>`
+        })
+        .join('')
+      return `<section class="mf-custom mf-custom-points" style="background:${soft};border-radius:10px;padding:16px 18px;margin:16px 0;">${rows}</section>`
+    }
     case 'highlight':
       return `<span class="mf-custom mf-custom-highlight" style="background:${bg};color:${color};padding:1px 5px;border-radius:3px;font-weight:500;">${inner}</span>`
     case 'html':
@@ -43,6 +86,10 @@ function buildTemplate(rule: CustomRule, inner: string): string {
     default:
       return inner
   }
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 /** marked 把扩展 tokenizer 以 { lexer } 为 this 调用 */
@@ -100,14 +147,22 @@ export function buildCustomExtensions(rules: CustomRule[]): unknown[] {
           this: RuleRendererCtx,
           token: { text?: string; title?: string; tokens?: unknown[] },
         ) {
-          const label = (token.title || '').trim()
+          const head = parseHead(token.title || '')
+          // 行首带的颜色/底色覆盖规则默认值
+          const merged: CustomRule = {
+            ...rule,
+            ...(head.color ? { color: head.color } : {}),
+            ...(head.bg ? { background: head.bg } : {}),
+            ...(head.label ? { label: head.label } : {}),
+          }
+          // 要点块按原始文本逐行解析，不需要块级 HTML
+          if (rule.component === 'points') {
+            return buildTemplate(merged, '', token.text || '')
+          }
           const body = isInline
             ? this.parser.parseInline(token.tokens ?? [])
             : this.parser.parse(token.tokens ?? [])
-          if (label && rule.component !== 'card' && rule.component !== 'quote') {
-            return buildTemplate({ ...rule, label }, body)
-          }
-          return buildTemplate(rule, body)
+          return buildTemplate(merged, body, token.text)
         },
       }
     })
@@ -139,6 +194,13 @@ export const DEFAULT_RULES: CustomRule[] = [
     symbol: ':::banner',
     component: 'banner',
     label: '重点',
+    enabled: true,
+  },
+  {
+    id: 'r-points',
+    symbol: ':::points',
+    component: 'points',
+    label: '要点',
     enabled: true,
   },
 ]

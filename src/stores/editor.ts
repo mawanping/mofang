@@ -84,6 +84,17 @@ export const useEditorStore = defineStore('editor', () => {
   /* ---------- 自定义符号 ---------- */
   const customRules = ref<CustomRule[]>([])
 
+  /**
+   * 当前画笔色：格式工具栏里点过的颜色。
+   * 选中文字时作为行内字色；不选文字时作为「插入模板块」的强调色，
+   * 让块的颜色写在块标记上（:::banner 重点 #E8622C），而不是包 span 破坏版式。
+   */
+  const brushColor = ref(localStorage.getItem('mf-brush') || '#2F6B4F')
+  function setBrushColor(c: string): void {
+    brushColor.value = c
+    localStorage.setItem('mf-brush', c)
+  }
+
   /* ---------- AI 配置 ---------- */
   const aiProvider = ref('pollinations')
   const aiApiKey = ref('')
@@ -258,6 +269,7 @@ export const useEditorStore = defineStore('editor', () => {
     saveState, lastSavedAt, wordCount, readMinutes,
     view, editorMode, previewMode, focusMode, leftPanel, leftCollapsed, toggleLeftPanel, aiPanelOpen, settingsOpen,
     customRules, aiProvider, aiApiKey, aiModel, aiPresets,
+    brushColor, setBrushColor,
     wbTheme, setWbTheme,
     panelTheme, panelCustom, panelColors, setPanelTheme, setPanelCustom, switchMode,
     loadAll, openDoc, newDoc, markDirty, flushSave, removeDoc, saveRules, saveAiConfig,

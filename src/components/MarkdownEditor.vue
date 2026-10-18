@@ -130,6 +130,21 @@ function getSelected(): string {
   return v.state.sliceDoc(from, to)
 }
 
+/**
+ * 光标/选区是否落在 `:::xxx ... :::` 块内部。
+ * 块内不要做行内上色 —— 包一层 span 会把 `1.` 这类行首语法打断，
+ * 或者把块内容变成转义后的纯文本，版式直接失效。
+ */
+function selectionInCustomBlock(): boolean {
+  const v = view.value
+  if (!v) return false
+  const { from } = v.state.selection.main
+  const before = v.state.sliceDoc(0, from)
+  const opens = (before.match(/^:::[a-zA-Z]/gm) || []).length
+  const closes = (before.match(/^:::[ \t]*$/gm) || []).length
+  return opens > closes
+}
+
 /** 插入文本并把其中的占位符选中，方便直接打字覆盖 */
 function insertAndSelect(text: string, selectText?: string) {
   const v = view.value
@@ -152,6 +167,7 @@ defineExpose({
   insert,
   getSelected,
   insertAndSelect,
+  selectionInCustomBlock,
   /** 滚动容器（同步滚动用） */
   scrollEl: (): HTMLElement | undefined => view.value?.scrollDOM,
 })
