@@ -3,6 +3,7 @@ import plainWhite from './plain-white.css?raw'
 import midnightInk from './midnight-ink.css?raw'
 import beyondOrange from './beyond-orange.css?raw'
 import darkOverride from './dark.css?raw'
+import typography from './typography.css?raw'
 
 export interface ThemeMeta {
   id: string
@@ -60,5 +61,7 @@ export function composeThemeCSS(themeId: string, primaryOverride?: string, dark 
       .replace(/--md-primary-color:\s*[^;]+;/g, `--md-primary-color: ${primaryOverride};`)
       .replace(/--md-link-color:\s*[^;]+;/g, `--md-link-color: ${primaryOverride};`)
   }
+  // 排版基线在所有主题之后注入：行高/段距/字距统一，主题只管配色与字体
+  css = `${css}\n${typography}`
   return dark ? `${css}\n${darkOverride}` : css
 }

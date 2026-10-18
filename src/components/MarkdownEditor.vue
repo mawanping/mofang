@@ -80,8 +80,10 @@ const extensions: Extension[] = [
     }
   }),
   EditorView.theme({
+    // 与公众号排版基线对齐：16px / 行高 1.85 / 字距 0.5px
     '&': { fontSize: '16px' },
     '.cm-content': { fontFamily: 'var(--font-mono)', padding: '0 14px' },
+    '.cm-line': { lineHeight: '1.85', letterSpacing: '0.5px' },
   }),
 ]
 

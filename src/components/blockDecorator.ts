@@ -178,7 +178,11 @@ function build(view: EditorView): DecorationSet {
         /* ---- 标题 ---- */
         const level = h[1].length
         const markEnd = line.from + h[1].length + h[2].length
-        const style = `padding-top:${level <= 2 ? 10 : 6}px;padding-bottom:2px`
+        // 标题行用紧凑行高。注意行元素自身字号是 16px，
+        // 写 line-height:1.35 只会算出 21.6px（比 30px 标题还矮，会压字），
+        // 所以要按标题实际字号换算成 px。
+        const fsPx = [30, 25, 21, 18, 16.5, 16][level - 1]
+        const style = `padding-top:${level <= 2 ? 10 : 6}px;padding-bottom:2px;line-height:${Math.round(fsPx * 1.35)}px`
         items.push(lineDeco(`cm-mf-h${level}-line`, style).range(line.from))
         items.push(markDeco('cm-mf-mark').range(line.from, markEnd))
         if (markEnd < line.to) {
