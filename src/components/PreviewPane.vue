@@ -118,18 +118,19 @@ defineExpose({ build, output })
       <span class="text-[10px] text-mf-ink-4">内联样式版 · 即粘贴后的真实效果</span>
     </div>
 
-    <!-- 预览主体：默认 390px 手机宽，桌面预览时全宽 -->
+    <!-- 预览主体：白底 + 一张居中的悬浮纸片（内容少时垂直居中，超长时正常滚动） -->
     <div
       ref="output"
-      class="mf-scroll flex-1 transition-colors"
-      :class="dark ? 'bg-[#17171A]' : 'bg-white'"
+      class="mf-scroll flex-1 flex flex-col p-3 transition-colors"
+      :class="dark ? 'bg-[#0E0E11]' : 'bg-white'"
     >
       <div
-        id="output"
-        :class="desktopPreview ? '' : 'mx-auto'"
-        :style="desktopPreview ? '' : 'max-width: 390px'"
-        v-html="clean"
-      ></div>
+        class="pv-paper"
+        :class="dark ? 'pv-paper--dark' : ''"
+        :style="{ width: desktopPreview ? '100%' : 'min(390px, 100%)' }"
+      >
+        <div id="output" v-html="clean"></div>
+      </div>
     </div>
 
     <!-- 底部信息行：预览开关 + 统计 -->
