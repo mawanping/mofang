@@ -2,6 +2,7 @@ import inkGreen from './ink-green.css?raw'
 import plainWhite from './plain-white.css?raw'
 import midnightInk from './midnight-ink.css?raw'
 import beyondOrange from './beyond-orange.css?raw'
+import darkOverride from './dark.css?raw'
 
 export interface ThemeMeta {
   id: string
@@ -46,11 +47,18 @@ export function getTheme(id: string): ThemeMeta {
   return THEMES.find((t) => t.id === id) ?? THEMES[0]
 }
 
-/** 主题 + 用户覆盖的主色，合成最终注入的 CSS */
-export function composeThemeCSS(themeId: string, primaryOverride?: string): string {
+/**
+ * 主题 + 用户覆盖的主色，合成最终注入的 CSS。
+ * @param dark 深色预览：在主题之后叠加 dark.css，把 --md-* 换成暗色系，
+ *             让黑色工作台下预览也是深底浅字（不是反色滤镜，图片/品牌色保持原样）
+ */
+export function composeThemeCSS(themeId: string, primaryOverride?: string, dark = false): string {
   const t = getTheme(themeId)
-  if (!primaryOverride) return t.css
-  return t.css
-    .replace(/--md-primary-color:\s*[^;]+;/g, `--md-primary-color: ${primaryOverride};`)
-    .replace(/--md-link-color:\s*[^;]+;/g, `--md-link-color: ${primaryOverride};`)
+  let css = t.css
+  if (primaryOverride) {
+    css = css
+      .replace(/--md-primary-color:\s*[^;]+;/g, `--md-primary-color: ${primaryOverride};`)
+      .replace(/--md-link-color:\s*[^;]+;/g, `--md-link-color: ${primaryOverride};`)
+  }
+  return dark ? `${css}\n${darkOverride}` : css
 }

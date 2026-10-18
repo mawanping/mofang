@@ -1,0 +1,65 @@
+/* ============================================================
+   深色预览覆盖层：工作台切到「黑色」配色时叠加在主题 CSS 之后
+   作用是把 --md-* 变量换成暗色系，让预览像手机深色模式，
+   而不是用 filter 反色（反色会把图片和品牌色一起毁掉）
+   ============================================================ */
+:root {
+  --md-text-primary: #EDEAE3;
+  --md-text-secondary: #C6C2B7;
+  --md-text-tertiary: #8B877C;
+  --md-bg-page: #17171A;
+  --md-bg-card: #202025;
+  --md-border: #35353D;
+  --md-quote-bg: rgba(255, 255, 255, 0.055);
+  --md-link-color: #86AFDC;
+}
+
+/* 代码块在深色底上要更暗一档，否则和页面糊在一起 */
+#output pre {
+  background: #0E0E10;
+  color: #E8E6E0;
+}
+#output code {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* 语义提示色：浅底换成深底，文字提亮 */
+#output .markdown-alert-note { background: #17263B; border-left-color: #4E8FD0; }
+#output .markdown-alert-note .markdown-alert-title { color: #8FBBEA; }
+
+#output .markdown-alert-tip { background: #12281F; border-left-color: #34A07C; }
+#output .markdown-alert-tip .markdown-alert-title { color: #6FCBA8; }
+
+#output .markdown-alert-warning { background: #2A2114; border-left-color: #C9902F; }
+#output .markdown-alert-warning .markdown-alert-title { color: #E0B463; }
+
+#output .markdown-alert-caution,
+#output .markdown-alert-danger,
+#output .markdown-alert-error { background: #2B1717; border-left-color: #C15050; }
+#output .markdown-alert-caution .markdown-alert-title,
+#output .markdown-alert-danger .markdown-alert-title,
+#output .markdown-alert-error .markdown-alert-title { color: #E08585; }
+
+#output .markdown-alert-success,
+#output .markdown-alert-done { background: #1B2913; border-left-color: #5E9C34; }
+#output .markdown-alert-success .markdown-alert-title,
+#output .markdown-alert-done .markdown-alert-title { color: #9ACB72; }
+
+#output .markdown-alert-quote,
+#output .markdown-alert-cite,
+#output .markdown-alert-example {
+  background: rgba(184, 153, 104, 0.12);
+}
+#output .markdown-alert-quote .markdown-alert-title,
+#output .markdown-alert-cite .markdown-alert-title,
+#output .markdown-alert-example .markdown-alert-title { color: #D9BC8A; }
+
+/* 表格表头与目录卡片需要一层比页面略亮的底 */
+#output th { background: rgba(255, 255, 255, 0.06); }
+#output .markdown-toc { background: rgba(255, 255, 255, 0.035); }
+
+/* 引用块 / 自定义块的默认淡底在深色下提亮一点点 */
+#output blockquote { background: rgba(255, 255, 255, 0.055); }
+
+/* 图片在没有边框的深底上容易糊边，补一圈细描边 */
+#output img { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06); }

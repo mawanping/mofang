@@ -50,6 +50,10 @@ function toggleToolbar() {
 const syncScroll = ref(localStorage.getItem('mf-sync-scroll') !== '0')
 watch(syncScroll, (v) => localStorage.setItem('mf-sync-scroll', v ? '1' : '0'))
 
+/* 深色预览：黑色工作台下默认跟黑暗模式一致，可单独关掉（关掉后复制出去是浅色排版） */
+const darkPreview = ref(localStorage.getItem('mf-dark-preview') !== '0')
+watch(darkPreview, (v) => localStorage.setItem('mf-dark-preview', v ? '1' : '0'))
+
 let scrollSyncing = false
 function bindSyncScroll() {
   const ed = editorRef.value?.scrollEl?.()
@@ -283,7 +287,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             :words="store.wordCount"
             :minutes="store.readMinutes"
             :last-saved-at="store.lastSavedAt"
+            :dark="darkPreview && store.wbTheme === 'dark'"
+            :wb-dark="store.wbTheme === 'dark'"
             @update:sync-scroll="syncScroll = $event"
+            @update:dark="darkPreview = $event"
           />
         </section>
       </template>

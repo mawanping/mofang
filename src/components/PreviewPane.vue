@@ -20,6 +20,10 @@ const props = defineProps<{
   words: number
   minutes: number
   lastSavedAt: number
+  /** 深色预览（黑色工作台下发散，与粘贴出去的效果一致） */
+  dark: boolean
+  /** 工作台是否为黑色配色（决定要不要显示深色预览开关） */
+  wbDark: boolean
 }>()
 
 const output = ref<HTMLDivElement>()
@@ -29,6 +33,13 @@ const themeStyleEl = ref<HTMLStyleElement>()
 /** 桌面端预览：390px 手机宽 ↔ 全宽桌面，持久化 */
 const desktopPreview = ref(localStorage.getItem('mf-desktop-preview') === '1')
 watch(desktopPreview, (v) => localStorage.setItem('mf-desktop-preview', v ? '1' : '0'))
+
+/** 底部空间有限，时间只留 HH:MM，完整说明放 title */
+const savedTime = computed(() =>
+  props.lastSavedAt
+    ? new Date(props.lastSavedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    : '',
+)
 
 const clean = computed(() =>
   DOMPurify.sanitize(wechatHtml.value, {
@@ -48,7 +59,7 @@ async function build() {
   // 注意：主题规则都以 `#output` 为作用域，而离屏 stage 不在 #output 里，
   // 若不改写选择器，stage 上算出来就是 Tailwind reset 之后的裸样式
   // （标题变 16px 常规字），内联下去粘到公众号就是「一片小字」。
-  const css = composeThemeCSS(props.themeId, props.primaryColor).replace(
+  const css = composeThemeCSS(props.themeId, props.primaryColor, props.dark).replace(
     /#output\b/g,
     ':is(#output, .mf-stage)',
   )
@@ -80,7 +91,7 @@ async function build() {
 
 let debounce: number | undefined
 watch(
-  () => [props.content, props.themeId, props.primaryColor, props.customRules] as const,
+  () => [props.content, props.themeId, props.primaryColor, props.customRules, props.dark] as const,
   () => {
     if (debounce) window.clearTimeout(debounce)
     debounce = window.setTimeout(build, 150)
@@ -108,7 +119,11 @@ defineExpose({ build, output })
     </div>
 
     <!-- 预览主体：默认 390px 手机宽，桌面预览时全宽 -->
-    <div ref="output" class="mf-scroll flex-1 bg-white">
+    <div
+      ref="output"
+      class="mf-scroll flex-1 transition-colors"
+      :class="dark ? 'bg-[#17171A]' : 'bg-white'"
+    >
       <div
         id="output"
         :class="desktopPreview ? '' : 'mx-auto'"
@@ -118,9 +133,9 @@ defineExpose({ build, output })
     </div>
 
     <!-- 底部信息行：预览开关 + 统计 -->
-    <div class="h-7 px-3 flex items-center gap-3 border-t border-mf-line bg-mf-side shrink-0 text-[10.5px] text-mf-ink-3 select-none">
+    <div class="h-7 px-3 flex items-center gap-2.5 border-t border-mf-line bg-mf-side shrink-0 text-[10.5px] text-mf-ink-3 select-none whitespace-nowrap">
       <button
-        class="flex items-center gap-1 hover:text-mf-primary transition-colors"
+        class="flex items-center gap-1 shrink-0 hover:text-mf-primary transition-colors"
         :class="desktopPreview ? 'text-mf-primary' : ''"
         :title="desktopPreview ? '切换为手机宽度预览' : '切换为桌面全宽预览'"
         @click="desktopPreview = !desktopPreview"
@@ -128,10 +143,10 @@ defineExpose({ build, output })
         <span class="w-6 h-3 rounded-full relative transition-colors" :class="desktopPreview ? 'bg-mf-primary' : 'bg-black/15'">
           <span class="absolute top-0.5 w-2 h-2 rounded-full bg-white transition-all" :class="desktopPreview ? 'left-3.5' : 'left-0.5'"></span>
         </span>
-        桌面端预览
+        桌面端
       </button>
       <button
-        class="flex items-center gap-1 hover:text-mf-primary transition-colors"
+        class="flex items-center gap-1 shrink-0 hover:text-mf-primary transition-colors"
         :class="syncScroll ? 'text-mf-primary' : ''"
         :title="syncScroll ? '关闭编辑区与预览区同步滚动' : '开启编辑区与预览区同步滚动'"
         @click="$emit('update:syncScroll', !syncScroll)"
@@ -139,11 +154,23 @@ defineExpose({ build, output })
         <span class="w-6 h-3 rounded-full relative transition-colors" :class="syncScroll ? 'bg-mf-primary' : 'bg-black/15'">
           <span class="absolute top-0.5 w-2 h-2 rounded-full bg-white transition-all" :class="syncScroll ? 'left-3.5' : 'left-0.5'"></span>
         </span>
-        同步滚动
+        同步
+      </button>
+      <button
+        v-if="wbDark"
+        class="flex items-center gap-1 shrink-0 hover:text-mf-primary transition-colors"
+        :class="dark ? 'text-mf-primary' : ''"
+        :title="dark ? '关闭深色预览（复制出去是浅色排版）' : '开启深色预览（复制出去是深色排版）'"
+        @click="$emit('update:dark', !dark)"
+      >
+        <span class="w-6 h-3 rounded-full relative transition-colors" :class="dark ? 'bg-mf-primary' : 'bg-black/15'">
+          <span class="absolute top-0.5 w-2 h-2 rounded-full bg-white transition-all" :class="dark ? 'left-3.5' : 'left-0.5'"></span>
+        </span>
+        深色
       </button>
       <div class="flex-1"></div>
-      <span v-if="lastSavedAt">上次修改 {{ new Date(lastSavedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) }}</span>
-      <span>{{ words }} 字 · 约 {{ minutes }} 分钟</span>
+      <span v-if="lastSavedAt" class="shrink-0" :title="`上次保存 ${savedTime}`">{{ savedTime }}</span>
+      <span class="shrink-0">{{ words }} 字 · {{ minutes }} 分</span>
     </div>
   </div>
 </template>
