@@ -44,8 +44,14 @@ async function build() {
   const { html: raw } = renderMarkdown(resolved, props.customRules)
   const expanded = raw
 
-  // 注入主题 CSS：内联化在离屏 stage 上进行，head 里的主题样式对其生效
-  const css = composeThemeCSS(props.themeId, props.primaryColor)
+  // 注入主题 CSS：内联化在离屏 stage 上进行，head 里的主题样式对其生效。
+  // 注意：主题规则都以 `#output` 为作用域，而离屏 stage 不在 #output 里，
+  // 若不改写选择器，stage 上算出来就是 Tailwind reset 之后的裸样式
+  // （标题变 16px 常规字），内联下去粘到公众号就是「一片小字」。
+  const css = composeThemeCSS(props.themeId, props.primaryColor).replace(
+    /#output\b/g,
+    ':is(#output, .mf-stage)',
+  )
   if (!themeStyleEl.value) {
     themeStyleEl.value = document.createElement('style')
     themeStyleEl.value.id = 'mf-theme'
@@ -56,6 +62,7 @@ async function build() {
   // 离屏渲染 class 版 → 预渲染图表（mermaid svg / plantuml 图定态）→ 行内化，
   // 得到与粘贴到公众号完全一致的 HTML
   const stage = document.createElement('div')
+  stage.className = 'mf-stage'
   stage.style.position = 'fixed'
   stage.style.left = '-99999px'
   stage.style.top = '0'
