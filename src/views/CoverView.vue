@@ -1,53 +1,39 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useEditorStore } from '../stores/editor'
-import { listAssets, putAsset, uid, type AssetRecord } from '../stores/db'
-import { generateImage } from '../ai/providers'
-import { RATIOS } from '../ai/providers'
+import { listAssets, type AssetRecord } from '../stores/db'
+import { COVER_SPECS, generateCover, saveCoverToAssets, type CoverRatio } from '../ai/cover'
 
 const store = useEditorStore()
 const assets = ref<AssetRecord[]>([])
-const urls = ref<Map<string, string>>(new Map())
 const prompt = ref('')
-const busy = ref(false)
+const busy = ref<CoverRatio | ''>('')
 const err = ref('')
-const big = ref<{ url: string } | null>(null)
-const square = ref<{ url: string } | null>(null)
+const result = ref<Map<CoverRatio, string>>(new Map())
 
 async function load() {
   assets.value = await listAssets()
-  urls.value = new Map(assets.value.map((a) => [a.id, URL.createObjectURL(a.blob)]))
 }
 
-async function gen(which: 'big' | 'square') {
+async function gen(which: CoverRatio) {
   const p = prompt.value.trim()
   if (!p || busy.value) return
-  busy.value = true
+  busy.value = which
   err.value = ''
   try {
-    const [w, h] = RATIOS[which === 'big' ? '2.35:1' : '1:1']
-    const r = await generateImage({
-      prompt: `公众号封面图，${p}，横版构图，主体居中，留出上方空间给标题文字，高质量`,
-      width: w,
-      height: h,
-      apiKey: store.aiApiKey || undefined,
-      model: store.aiProvider === 'pollinations' ? undefined : (store.aiModel || undefined),
-      seed: Math.floor(Math.random() * 1e6),
-    })
-    if (which === 'big') big.value = r
-    else square.value = r
+    const url = await generateCover(p, which)
+    result.value = new Map(result.value).set(which, url)
   } catch (e) {
     err.value = (e as Error).message
   } finally {
-    busy.value = false
+    busy.value = ''
   }
 }
 
-async function useAs(r: { url: string }, label: string) {
-  const res = await fetch(r.url)
-  const blob = await res.blob()
-  const id = uid()
-  await putAsset({ id, name: `cover-${label}-${id}.png`, blob, type: blob.type, size: blob.size, createdAt: Date.now() })
+async function useAs(ratio: CoverRatio) {
+  const url = result.value.get(ratio)
+  if (!url) return
+  await saveCoverToAssets(url, ratio)
   await load()
 }
 
@@ -64,32 +50,32 @@ onMounted(load)
 
       <div class="bg-mf-card rounded-lg border border-mf-line p-4 space-y-3">
         <p class="text-[12px] text-mf-ink-3 leading-relaxed">
-          公众号封面两种尺寸：头条 2.35:1（900×383），次条 1:1。AI 生成后可一键存入素材库。
+          公众号封面两种尺寸：头条 2.35:1（900×383），次条 1:1。AI 生成后可一键存入素材库（素材库内也新增了「封面生成」入口，两边同源）。
         </p>
         <div class="flex gap-2">
           <input v-model="prompt" class="flex-1 px-2.5 py-1.5 rounded-md border border-mf-line text-[12px] outline-none focus:border-mf-primary" placeholder="描述封面画面，例如：青绿山水间一只仙鹤掠过" @keyup.enter="gen('big')" />
-          <button class="px-3 py-1.5 rounded-md bg-mf-primary text-white text-[12px] disabled:opacity-50" :disabled="busy || !prompt.trim()" @click="gen('big')">{{ busy ? '…' : '生成头条' }}</button>
-          <button class="px-3 py-1.5 rounded-md border border-mf-line-2 text-[12px] disabled:opacity-50" :disabled="busy || !prompt.trim()" @click="gen('square')">{{ busy ? '…' : '生成方图' }}</button>
+          <button class="px-3 py-1.5 rounded-md bg-mf-primary text-white text-[12px] disabled:opacity-50" :disabled="!!busy || !prompt.trim()" @click="gen('big')">{{ busy === 'big' ? '…' : '生成头条' }}</button>
+          <button class="px-3 py-1.5 rounded-md border border-mf-line-2 text-[12px] disabled:opacity-50" :disabled="!!busy || !prompt.trim()" @click="gen('square')">{{ busy === 'square' ? '…' : '生成方图' }}</button>
         </div>
         <p v-if="err" class="text-[11px] text-red-600">{{ err }}</p>
       </div>
 
       <div class="grid grid-cols-2 gap-3">
-        <div class="bg-mf-card rounded-lg border border-mf-line p-3">
-          <p class="text-[11px] text-mf-ink-3 mb-2">2.35 : 1 头条封面</p>
-          <div class="aspect-[2.35/1] rounded-md bg-mf-app border border-mf-line overflow-hidden flex items-center justify-center">
-            <img v-if="big" :src="big.url" class="w-full h-full object-cover" />
+        <div v-for="s in COVER_SPECS" :key="s.ratio" class="bg-mf-card rounded-lg border border-mf-line p-3">
+          <p class="text-[11px] text-mf-ink-3 mb-2">{{ s.label }} {{ s.name }}</p>
+          <div class="rounded-md bg-mf-app border border-mf-line overflow-hidden flex items-center justify-center" :style="{ aspectRatio: s.css }">
+            <img v-if="result.get(s.ratio)" :src="result.get(s.ratio)" class="w-full h-full object-cover" />
             <span v-else class="text-[11px] text-mf-ink-4">未生成</span>
           </div>
-          <button v-if="big" class="mt-2 w-full py-1.5 rounded-md border border-mf-line-2 text-[12px] hover:border-mf-primary hover:text-mf-primary" @click="useAs(big, 'big')">存入素材库</button>
+          <button v-if="result.get(s.ratio)" class="mt-2 w-full py-1.5 rounded-md border border-mf-line-2 text-[12px] hover:border-mf-primary hover:text-mf-primary" @click="useAs(s.ratio)">存入素材库</button>
         </div>
-        <div class="bg-mf-card rounded-lg border border-mf-line p-3">
-          <p class="text-[11px] text-mf-ink-3 mb-2">1 : 1 次条封面</p>
-          <div class="aspect-square rounded-md bg-mf-app border border-mf-line overflow-hidden flex items-center justify-center">
-            <img v-if="square" :src="square.url" class="w-full h-full object-cover" />
-            <span v-else class="text-[11px] text-mf-ink-4">未生成</span>
-          </div>
-          <button v-if="square" class="mt-2 w-full py-1.5 rounded-md border border-mf-line-2 text-[12px] hover:border-mf-primary hover:text-mf-primary" @click="useAs(square, 'square')">存入素材库</button>
+      </div>
+
+      <div class="bg-mf-card rounded-lg border border-mf-line p-4">
+        <p class="text-[12px] text-mf-ink-3 mb-2">素材库中的封面（{{ assets.filter((a) => a.name.startsWith('封面-')).length }} 张）</p>
+        <div class="grid grid-cols-4 gap-2">
+          <img v-for="a in assets.filter((x) => x.name.startsWith('封面-'))" :key="a.id" class="w-full h-14 object-cover rounded border border-mf-line" :alt="a.name" />
+          <p v-if="!assets.filter((a) => a.name.startsWith('封面-')).length" class="text-[11px] text-mf-ink-4 col-span-4">还没有封面素材</p>
         </div>
       </div>
     </div>

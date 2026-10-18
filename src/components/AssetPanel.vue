@@ -2,11 +2,20 @@
 import { ref, computed, onMounted } from 'vue'
 import { useEditorStore } from '../stores/editor'
 import { listAssets, putAsset, deleteAsset, uid, type AssetRecord } from '../stores/db'
+import { COVER_SPECS, makeCover, type CoverRatio } from '../ai/cover'
 
 const store = useEditorStore()
 const assets = ref<AssetRecord[]>([])
 const urls = ref<Map<string, string>>(new Map())
 const dragging = ref(false)
+
+/* ---------- 封面生成 ---------- */
+const showCover = ref(false)
+const coverPrompt = ref('')
+const coverBusy = ref<CoverRatio | ''>('')
+const coverErr = ref('')
+const coverFresh = ref<Map<CoverRatio, string>>(new Map())
+const hasKey = computed(() => store.aiProvider === 'pollinations' || !!store.aiApiKey)
 
 async function load() {
   assets.value = await listAssets()
@@ -49,6 +58,23 @@ function fmtSize(n: number): string {
   return n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`
 }
 
+/** 生成封面并直接入库 */
+async function gen(ratio: CoverRatio) {
+  const p = coverPrompt.value.trim()
+  if (!p || coverBusy.value) return
+  coverBusy.value = ratio
+  coverErr.value = ''
+  try {
+    await makeCover(p, ratio)
+    coverFresh.value = new Map(coverFresh.value).set(ratio, '1')
+    await load()
+  } catch (e) {
+    coverErr.value = (e as Error).message
+  } finally {
+    coverBusy.value = ''
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -56,10 +82,47 @@ onMounted(load)
   <div class="h-full flex flex-col">
     <div class="px-2.5 py-2 border-b border-mf-line flex items-center justify-between shrink-0">
       <span class="text-[11px] font-medium text-mf-ink-2">素材库</span>
-      <label class="text-[11px] text-mf-primary cursor-pointer hover:underline">
-        上传
-        <input type="file" accept="image/*" multiple class="hidden" @change="onFiles(($event.target as HTMLInputElement).files)" />
-      </label>
+      <div class="flex items-center gap-2.5">
+        <button
+          class="text-[11px] transition-colors"
+          :class="showCover ? 'text-mf-primary font-medium' : 'text-mf-primary hover:underline'"
+          @click="showCover = !showCover"
+        >{{ showCover ? '收起封面生成' : '封面生成' }}</button>
+        <label class="text-[11px] text-mf-ink-3 cursor-pointer hover:text-mf-primary">
+          上传
+          <input type="file" accept="image/*" multiple class="hidden" @change="onFiles(($event.target as HTMLInputElement).files)" />
+        </label>
+      </div>
+    </div>
+
+    <!-- 封面生成 -->
+    <div v-if="showCover" class="mx-2.5 mt-2 rounded-md border border-mf-primary/30 bg-mf-primary-soft/40 p-2 shrink-0">
+      <p class="text-[10.5px] text-mf-ink-3 leading-relaxed mb-1.5">
+        AI 生成公众号封面：<b class="text-mf-ink-2">2.35:1</b> 头条（900×383）/ <b class="text-mf-ink-2">1:1</b> 次条，生成后自动存入素材库。
+      </p>
+      <textarea
+        v-model="coverPrompt"
+        rows="2"
+        class="w-full px-2 py-1.5 rounded-md border border-mf-line bg-white text-[11px] leading-relaxed outline-none focus:border-mf-primary resize-none"
+        placeholder="描述封面画面，例如：青绿山水间一只仙鹤掠过"
+      />
+      <div class="flex gap-1.5 mt-1.5">
+        <button
+          v-for="s in COVER_SPECS"
+          :key="s.ratio"
+          class="flex-1 py-1 rounded-md text-[10.5px] transition-colors border"
+          :class="coverFresh.has(s.ratio) ? 'border-mf-primary bg-mf-primary text-white' : 'border-mf-line-2 text-mf-ink-2 hover:border-mf-primary hover:text-mf-primary'"
+          :disabled="!!coverBusy || !coverPrompt.trim()"
+          :title="`生成 ${s.name}（${s.label}）`"
+          @click="gen(s.ratio)"
+        >
+          {{ coverBusy === s.ratio ? '生成中…' : coverFresh.has(s.ratio) ? `${s.name} 已入库` : `生成${s.name}` }}
+        </button>
+      </div>
+      <p v-if="!hasKey" class="text-[10px] text-amber-700 mt-1.5">
+        当前渠道 <b>{{ store.aiProvider }}</b> 需要 API Key，请到设置里填写。
+      </p>
+      <p v-if="coverErr" class="text-[10px] text-red-600 mt-1.5">{{ coverErr }}</p>
     </div>
 
     <div

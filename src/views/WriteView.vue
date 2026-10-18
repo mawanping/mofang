@@ -7,6 +7,12 @@ import DocList from '../components/DocList.vue'
 import AssetPanel from '../components/AssetPanel.vue'
 import TopBar from '../components/TopBar.vue'
 import FormatToolbar from '../components/FormatToolbar.vue'
+import { TEMPLATE_BLOCKS } from '../markdown/templates'
+
+/** 模板模式：插入结构块 */
+function insertTemplate(md: string): void {
+  editorRef.value?.insertAndSelect(md)
+}
 
 const store = useEditorStore()
 const editorRef = ref<InstanceType<typeof MarkdownEditor>>()
@@ -216,6 +222,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           @inline="onFormatInline"
           @reset="onFormatReset"
         />
+        <!-- 模板模式专属：公众号结构块一键插入 -->
+        <div
+          v-if="store.editorMode === 'template'"
+          class="shrink-0 px-2.5 py-1.5 border-b border-mf-line bg-mf-side/60 flex items-center gap-1.5 overflow-x-auto mf-scroll"
+        >
+          <span class="text-[10.5px] text-mf-ink-4 shrink-0 pr-1">结构模板</span>
+          <button
+            v-for="b in TEMPLATE_BLOCKS"
+            :key="b.id"
+            class="shrink-0 px-2 py-1 rounded-md text-[11px] border border-mf-line-2 text-mf-ink-2 hover:border-mf-primary hover:text-mf-primary hover:bg-mf-primary-soft transition-colors"
+            :title="b.desc"
+            @click="insertTemplate(b.md)"
+          >{{ b.name }}</button>
+        </div>
+
         <div class="flex-1 min-h-0">
           <MarkdownEditor :model-value="store.content" @update:model-value="onInput" ref="editorRef" />
         </div>

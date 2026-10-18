@@ -134,14 +134,19 @@ async function onExportPdf() {
         <button
           class="px-2.5 py-0.5 rounded text-[11.5px] transition-colors"
           :class="store.editorMode === 'markdown' ? 'bg-white text-mf-primary font-medium shadow-sm' : 'text-mf-ink-3'"
+          title="Markdown 模式：纯源码编辑，适合熟练手写语法"
           @click="store.switchMode('markdown')"
         >Markdown</button>
         <button
           class="px-2.5 py-0.5 rounded text-[11.5px] transition-colors"
           :class="store.editorMode === 'template' ? 'bg-white text-mf-primary font-medium shadow-sm' : 'text-mf-ink-3'"
+          title="公众号模板模式：编辑器上方多一行结构模板按钮（大标题/导语/金句/引用卡片/结尾互动等），一键插入成稿骨架，并自动套用橙色调"
           @click="store.switchMode('template')"
         >公众号模板</button>
       </div>
+      <span class="text-[10.5px] text-mf-ink-4 shrink-0 -ml-1 hidden xl:inline">
+        {{ store.editorMode === 'template' ? '上方结构模板已启用' : '纯 Markdown 源码' }}
+      </span>
 
       <div class="w-px h-4 bg-mf-line-2"></div>
 
